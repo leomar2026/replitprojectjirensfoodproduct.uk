@@ -1,0 +1,36 @@
+{
+  "name": "Jiren's Food Product",
+  "short_name": "Jiren's Food",
+  "description": "Authentic Filipino frozen food — tocino, longanisa, hotdogs, beef tapa, and chili garlic oil, with delivery and online ordering.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#b91c1c",
+  "background_color": "#fffaf2",
+  "lang": "en-GB",
+  "categories": ["food", "shopping"],
+  "icons": [
+    {
+      "src": "/jirens-logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/jirens-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/banner.png",
+      "sizes": "1920x960",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Jiren's Food Product storefront"
+    }
+  ]
+}

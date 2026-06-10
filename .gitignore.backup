@@ -1,0 +1,45 @@
+# ── Dependencies ───────────────────────────────────────────────────────────────
+node_modules/
+
+# ── Environment & secrets ──────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Uploads (keep directory structure via .gitkeep; ignore actual files) ───────
+uploads/proofs/*
+!uploads/proofs/.gitkeep
+public/uploads/products/*
+!public/uploads/products/.gitkeep
+public/uploads/banners/*
+!public/uploads/banners/.gitkeep
+
+# ── Build artefacts ────────────────────────────────────────────────────────────
+dist/
+build/
+coverage/
+
+# ── Logs ───────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Archives & backups ─────────────────────────────────────────────────────────
+*.zip
+*.gz
+*.tar
+_folder-backups/
+backup/
+
+# ── Replit platform files ──────────────────────────────────────────────────────
+.replit
+.upm/
+.cache/
+.agents/
+.local/
+attached_assets/
+
+# ── OS / editor ────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -7,14 +7,34 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 const { upload, UPLOAD_DIR } = require('../middleware/upload');
 const { nextSerialNumber, addAuditLog } = require('../utils/db-helpers');
 
+const crypto = require('crypto');
+
+const PRODUCT_IMG_DIR = path.join(__dirname, '..', 'public', 'uploads', 'products');
+if (!fs.existsSync(PRODUCT_IMG_DIR)) fs.mkdirSync(PRODUCT_IMG_DIR, { recursive: true });
+
+const productImgStorage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, PRODUCT_IMG_DIR),
+    filename: (req, file, cb) => {
+        const unique = `product-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.jpg`;
+        cb(null, unique);
+    }
+});
 const uploadProductImg = multer({
-    storage: multer.memoryStorage(),
+    storage: productImgStorage,
     limits: { fileSize: 5 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         if (/image\/(jpeg|jpg|png|webp)/.test(file.mimetype)) cb(null, true);
-        else cb(new Error('Only jpg, png, webp images are allowed.'));
+        else cb(new Error('Only JPG, PNG, WEBP images are allowed.'));
     }
 });
+
+function deleteProductFile(imageFilename) {
+    if (!imageFilename || !imageFilename.startsWith('/uploads/products/')) return;
+    try {
+        const fp = path.join(__dirname, '..', 'public', imageFilename);
+        if (fs.existsSync(fp)) fs.unlinkSync(fp);
+    } catch (_) {}
+}
 
 const router = express.Router();
 
@@ -121,22 +141,33 @@ router.put('/products/:id', requireRole('manager', 'admin'), async (req, res) =>
     }
 });
 
-// POST /api/admin/products/:id/image — upload product image (stored as base64 in DB)
+// POST /api/admin/products/upload-image — pre-upload image before product is created
+router.post('/products/upload-image', requireRole('manager', 'admin'), (req, res, next) => {
+    uploadProductImg.single('image')(req, res, (err) => {
+        if (err) return res.status(400).json({ error: err.message });
+        if (!req.file) return res.status(400).json({ error: 'No image file provided.' });
+        res.json({ imageUrl: `/uploads/products/${req.file.filename}` });
+    });
+});
+
+// POST /api/admin/products/:id/image — upload / replace product image (saved to disk)
 router.post('/products/:id/image', requireRole('manager', 'admin'), (req, res, next) => {
     uploadProductImg.single('image')(req, res, async (err) => {
         if (err) return res.status(400).json({ error: err.message });
         if (!req.file) return res.status(400).json({ error: 'No image file provided.' });
         const { id } = req.params;
-        const mime = req.file.mimetype || 'image/jpeg';
-        const imageUrl = `data:${mime};base64,${req.file.buffer.toString('base64')}`;
+        const imageUrl = `/uploads/products/${req.file.filename}`;
         try {
-            const result = await pool.query(
-                'UPDATE products SET image_filename = $1 WHERE id = $2 RETURNING id, image_filename',
-                [imageUrl, id]
-            );
-            if (!result.rows.length) return res.status(404).json({ error: 'Product not found.' });
+            const existing = await pool.query('SELECT image_filename FROM products WHERE id=$1', [id]);
+            if (!existing.rows.length) {
+                deleteProductFile(imageUrl);
+                return res.status(404).json({ error: 'Product not found.' });
+            }
+            deleteProductFile(existing.rows[0].image_filename);
+            await pool.query('UPDATE products SET image_filename = $1 WHERE id = $2', [imageUrl, id]);
             res.json({ imageUrl });
         } catch (dbErr) {
+            deleteProductFile(imageUrl);
             console.error('POST /api/admin/products/:id/image error:', dbErr);
             res.status(500).json({ error: 'Failed to save image.' });
         }

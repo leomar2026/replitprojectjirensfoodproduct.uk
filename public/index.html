@@ -8711,16 +8711,23 @@
           status.classList.remove('error');
         }
       }
-      function selectNewProductImage(event) {
+      async function selectNewProductImage(event) {
         const file = event.target.files?.[0];
-        readProductImageFile(file, 'new-product-image-status')
-          .then((imageUrl) => {
-            document.getElementById('new-product-image').value = imageUrl;
-            previewNewProductImage(imageUrl);
-            setProductImageStatus('new-product-image-status', 'Image ready for this item.');
-          })
-          .catch((error) => setProductImageStatus('new-product-image-status', error.message, true))
-          .finally(() => { event.target.value = ''; });
+        event.target.value = '';
+        if (!file) return;
+        const validationError = validateProductImageFile(file);
+        if (validationError) { setProductImageStatus('new-product-image-status', validationError, true); return; }
+        setProductImageStatus('new-product-image-status', 'Uploading image...');
+        try {
+          const formData = new FormData();
+          formData.append('image', file);
+          const res = await fetch('/api/admin/products/upload-image', { method: 'POST', credentials: 'same-origin', body: formData });
+          const data = await res.json();
+          if (!res.ok) { setProductImageStatus('new-product-image-status', data.error || 'Upload failed.', true); return; }
+          document.getElementById('new-product-image').value = data.imageUrl;
+          previewNewProductImage(data.imageUrl);
+          setProductImageStatus('new-product-image-status', 'Image ready.');
+        } catch (e) { setProductImageStatus('new-product-image-status', 'Upload failed. Check connection.', true); }
       }
       function previewManagerNewProductImage(value) {
         const preview = document.getElementById('manager-new-product-image-preview');
@@ -8730,16 +8737,23 @@
         }
         setProductImageStatus('manager-new-product-image-status', value ? 'Image URL ready.' : '');
       }
-      function selectManagerNewProductImage(event) {
+      async function selectManagerNewProductImage(event) {
         const file = event.target.files?.[0];
-        readProductImageFile(file, 'manager-new-product-image-status')
-          .then((imageUrl) => {
-            document.getElementById('manager-new-product-image').value = imageUrl;
-            previewManagerNewProductImage(imageUrl);
-            setProductImageStatus('manager-new-product-image-status', 'Image ready for this item.');
-          })
-          .catch((error) => setProductImageStatus('manager-new-product-image-status', error.message, true))
-          .finally(() => { event.target.value = ''; });
+        event.target.value = '';
+        if (!file) return;
+        const validationError = validateProductImageFile(file);
+        if (validationError) { setProductImageStatus('manager-new-product-image-status', validationError, true); return; }
+        setProductImageStatus('manager-new-product-image-status', 'Uploading image...');
+        try {
+          const formData = new FormData();
+          formData.append('image', file);
+          const res = await fetch('/api/admin/products/upload-image', { method: 'POST', credentials: 'same-origin', body: formData });
+          const data = await res.json();
+          if (!res.ok) { setProductImageStatus('manager-new-product-image-status', data.error || 'Upload failed.', true); return; }
+          document.getElementById('manager-new-product-image').value = data.imageUrl;
+          previewManagerNewProductImage(data.imageUrl);
+          setProductImageStatus('manager-new-product-image-status', 'Image ready.');
+        } catch (e) { setProductImageStatus('manager-new-product-image-status', 'Upload failed. Check connection.', true); }
       }
       async function uploadProductImage(event, id, target = 'both') {
         if (target === 'ecommerce') requireApiPermission('products:price');

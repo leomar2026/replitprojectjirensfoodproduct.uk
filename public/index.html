@@ -3371,6 +3371,13 @@
           deliveryNumber: o.delivery_number || '',
           customer: o.customer_name,
           phone: o.customer_phone,
+          fulfillmentMethod: o.fulfillment_method || 'pickup',
+          deliveryDate: o.delivery_date || '',
+          deliveryAddress: o.delivery_address || '',
+          deliveryCity: o.delivery_city || '',
+          deliveryArea: o.delivery_area || '',
+          notes: o.notes || '',
+          createdAt: o.created_at || '',
           items: items.map(i => `${i.quantity}x ${i.product_name}`).join(', '),
           lineItems: items.map(i => ({
             id: i.product_id || i.id,
@@ -6189,25 +6196,51 @@
         const panel = document.getElementById('drawer-tab-details');
         if (!panel) return;
         const isDelivery = (order.fulfillmentMethod || '').toLowerCase() === 'delivery';
-        const address = [order.deliveryAddress || order.delivery_address, order.deliveryCity || order.delivery_city, order.deliveryArea || order.delivery_area].filter(Boolean).join(', ');
+        const addrLines = [order.deliveryAddress, order.deliveryCity, order.deliveryArea].filter(Boolean);
+        const fullAddress = addrLines.join(', ');
+        const delivDate = order.deliveryDate ? new Date(order.deliveryDate).toLocaleDateString('en-GB', {weekday:'long',day:'2-digit',month:'long',year:'numeric'}) : '–';
+        const shippingLabel = [order.customer, order.phone, ...addrLines].filter(Boolean).join('\n');
         panel.innerHTML = `
           <h3 style="margin:0 0 12px;font-size:.95rem;font-weight:900;text-transform:uppercase;letter-spacing:.04em;color:rgba(32,32,32,.55)">Customer</h3>
           <div class="detail-grid" style="margin-bottom:20px">
             ${_df('Name', order.customer)}
-            ${_df('Phone', order.phone)}
+            ${_df('Phone', `<a href="tel:${order.phone}" style="color:inherit">${order.phone || '–'}</a>`)}
           </div>
+          ${isDelivery ? `
+          <h3 style="margin:0 0 12px;font-size:.95rem;font-weight:900;text-transform:uppercase;letter-spacing:.04em;color:rgba(32,32,32,.55)">Shipment Details</h3>
+          <div style="background:linear-gradient(135deg,#eff6ff 0%,#f0fdf4 100%);border:1.5px solid #bfdbfe;border-radius:10px;padding:14px 16px;margin-bottom:18px;position:relative">
+            <div style="font-size:.75rem;font-weight:700;color:#1d4ed8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">📦 Delivery Address</div>
+            <div style="font-size:.97rem;font-weight:700;color:#111;margin-bottom:2px">${order.customer}</div>
+            <div style="font-size:.88rem;color:#374151;margin-bottom:4px">${order.phone || ''}</div>
+            ${addrLines.map((line, i) => `<div style="font-size:${i === 0 ? '.93' : '.86'}rem;color:#1f2937;${i === 0 ? 'font-weight:600' : ''}">${line}</div>`).join('')}
+            ${!addrLines.length ? '<div style="color:#9ca3af;font-style:italic;font-size:.85rem">No address provided</div>' : ''}
+            <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+              <button type="button" onclick="navigator.clipboard.writeText(${JSON.stringify(shippingLabel)}).then(()=>showToast('Address copied!'))" style="font-size:.75rem;padding:4px 10px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">📋 Copy address</button>
+              ${order.phone ? `<a href="tel:${order.phone}" style="font-size:.75rem;padding:4px 10px;background:#16a34a;color:#fff;border-radius:6px;text-decoration:none;font-weight:600">📞 Call customer</a>` : ''}
+            </div>
+          </div>
+          <div class="detail-grid" style="margin-bottom:20px">
+            ${_df('Delivery Date', delivDate)}
+            ${order.deliveryAddress ? _df('Street / House', order.deliveryAddress) : ''}
+            ${order.deliveryCity ? _df('City', order.deliveryCity) : ''}
+            ${order.deliveryArea ? _df('Area / Postcode', order.deliveryArea) : ''}
+          </div>
+          ` : `
           <h3 style="margin:0 0 12px;font-size:.95rem;font-weight:900;text-transform:uppercase;letter-spacing:.04em;color:rgba(32,32,32,.55)">Fulfillment</h3>
           <div class="detail-grid" style="margin-bottom:20px">
-            ${_df('Method', isDelivery ? '🚚 Delivery' : '🏪 Pickup')}
-            ${isDelivery ? _df('Delivery Date', order.deliveryDate || order.delivery_date || '–') : ''}
-            ${isDelivery && address ? _df('Address', address) : ''}
+            ${_df('Method', '🏪 Pickup')}
           </div>
+          `}
+          ${order.notes ? `
+          <h3 style="margin:0 0 8px;font-size:.95rem;font-weight:900;text-transform:uppercase;letter-spacing:.04em;color:rgba(32,32,32,.55)">Customer Notes</h3>
+          <div style="background:#fefce8;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;font-size:.88rem;color:#713f12;margin-bottom:18px;white-space:pre-wrap">${order.notes}</div>
+          ` : ''}
           <h3 style="margin:0 0 12px;font-size:.95rem;font-weight:900;text-transform:uppercase;letter-spacing:.04em;color:rgba(32,32,32,.55)">Order Info</h3>
           <div class="detail-grid">
             ${_df('Order No.', order.orderNumber || order.id)}
             ${_df('Invoice No.', order.invoiceNumber || 'Pending')}
             ${_df('Delivery No.', order.deliveryNumber || 'Pending')}
-            ${_df('Date', order.createdAt ? new Date(order.createdAt).toLocaleString('en-GB') : '–')}
+            ${_df('Placed On', order.createdAt ? new Date(order.createdAt).toLocaleString('en-GB') : '–')}
             ${_df('Order Status', order.orderStatus || 'Pending')}
             ${_df('Payment Status', order.paymentStatus || 'Pending')}
           </div>
@@ -6333,10 +6366,18 @@
         const dateStr = order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}) : '–';
         const isDelivery = (order.fulfillmentMethod || '').toLowerCase() === 'delivery';
         const methodLabel = isDelivery ? '🚚 Delivery' : '🏪 Pickup';
+        const addrParts = [order.deliveryAddress, order.deliveryCity, order.deliveryArea].filter(Boolean);
+        const addrSnippet = addrParts.length ? addrParts.join(', ') : '';
+        const delivDateStr = order.deliveryDate ? new Date(order.deliveryDate).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}) : '';
         return `
           <tr>
             <td><strong style="font-size:.9rem">${order.orderNumber || order.id}</strong><div class="order-row-meta">${order.invoiceNumber || ''}</div></td>
-            <td><strong>${order.customer}</strong><div class="order-row-meta">${order.phone || ''}</div></td>
+            <td>
+              <strong>${order.customer}</strong>
+              <div class="order-row-meta">${order.phone || ''}</div>
+              ${isDelivery && addrSnippet ? `<div class="order-row-meta" style="color:#374151;margin-top:2px;max-width:220px;white-space:normal;line-height:1.3">📍 ${addrSnippet}</div>` : ''}
+              ${isDelivery && delivDateStr ? `<div class="order-row-meta" style="margin-top:1px">📅 ${delivDateStr}</div>` : ''}
+            </td>
             <td><span style="font-size:.82rem">${methodLabel}</span></td>
             <td>
               <span class="status-badge ${payBadgeClass}" style="font-size:.75rem">${payLabel}</span>

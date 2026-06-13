@@ -1942,6 +1942,8 @@
                 </select>
                 <input id="order-filter-date" type="date" onchange="filterAdminOrders()" />
                 <button class="secondary" onclick="clearOrderFilters()">Clear filters</button>
+                <button class="secondary" type="button" onclick="printOrders()" title="Print / Save as PDF">🖨 Print</button>
+                <button class="primary" type="button" onclick="exportOrdersExcel()" title="Download Excel">⬇ Excel</button>
               </div>
               <div class="product-table-wrap">
                 <table>
@@ -6158,6 +6160,129 @@
         ['order-filter-search','order-filter-date'].forEach((id) => { const el = document.getElementById(id); if (el) el.value = ''; });
         ['order-filter-status','order-filter-payment','order-filter-method'].forEach((id) => { const el = document.getElementById(id); if (el) el.value = ''; });
         filterAdminOrders();
+      }
+      function getAdminFilteredOrders() {
+        const search = (document.getElementById('order-filter-search')?.value || '').trim().toLowerCase();
+        const status = document.getElementById('order-filter-status')?.value || '';
+        const payment = document.getElementById('order-filter-payment')?.value || '';
+        const method = document.getElementById('order-filter-method')?.value || '';
+        const date = document.getElementById('order-filter-date')?.value || '';
+        let filtered = submittedOrders;
+        if (search) filtered = filtered.filter((o) =>
+          (o.orderNumber || o.id || '').toString().toLowerCase().includes(search) ||
+          (o.customer || '').toLowerCase().includes(search) ||
+          (o.phone || '').toLowerCase().includes(search)
+        );
+        if (status) filtered = filtered.filter((o) => o.orderStatus === status);
+        if (payment) filtered = filtered.filter((o) => (o.method || o.paymentMethod || '').toLowerCase().replace(/\s+/g,'_').replace(/\//g,'_') === payment);
+        if (method) filtered = filtered.filter((o) => (o.fulfillmentMethod || '').toLowerCase() === method);
+        if (date) filtered = filtered.filter((o) => o.createdAt && new Date(o.createdAt).toISOString().startsWith(date));
+        return filtered;
+      }
+      function printOrders() {
+        requireApiPermission('reports:print');
+        const orders = getAdminFilteredOrders();
+        const now = new Date().toLocaleString('en-GB');
+        const filterDesc = (() => {
+          const parts = [];
+          const s = document.getElementById('order-filter-search')?.value?.trim();
+          const st = document.getElementById('order-filter-status')?.value;
+          const py = document.getElementById('order-filter-payment')?.value;
+          const mt = document.getElementById('order-filter-method')?.value;
+          const dt = document.getElementById('order-filter-date')?.value;
+          if (s) parts.push(`Search: "${s}"`);
+          if (st) parts.push(`Status: ${st}`);
+          if (py) parts.push(`Payment: ${py}`);
+          if (mt) parts.push(`Type: ${mt}`);
+          if (dt) parts.push(`Date: ${dt}`);
+          return parts.length ? parts.join(' | ') : 'All orders';
+        })();
+        const rows = orders.map((o) => {
+          const addr = [o.deliveryAddress, o.deliveryCity, o.deliveryArea].filter(Boolean).join(', ') || '–';
+          const delivDate = o.deliveryDate ? new Date(o.deliveryDate).toLocaleDateString('en-GB') : '–';
+          const orderDate = o.createdAt ? new Date(o.createdAt).toLocaleDateString('en-GB') : '–';
+          const itemsList = Array.isArray(o.lineItems) && o.lineItems.length
+            ? o.lineItems.map((i) => `${i.quantity}× ${i.name}`).join('<br>')
+            : (o.items || '–');
+          const isDelivery = (o.fulfillmentMethod || '').toLowerCase() === 'delivery';
+          return `<tr>
+            <td>${orderDate}</td>
+            <td>${o.orderNumber || o.id}</td>
+            <td>${o.customer || '–'}</td>
+            <td>${o.phone || '–'}</td>
+            <td>${isDelivery ? addr : '<em>Pickup</em>'}</td>
+            <td>${isDelivery ? delivDate : '–'}</td>
+            <td style="text-align:left">${itemsList}</td>
+            <td style="text-align:right">${money(o.deliveryFee || 0)}</td>
+            <td style="text-align:right"><strong>${money(o.total)}</strong></td>
+            <td>${o.paymentStatus || 'Pending'}</td>
+            <td>${o.orderStatus || 'Pending'}</td>
+          </tr>`;
+        }).join('');
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Orders Export — Jiren's Food Product</title>
+        <style>
+          *{box-sizing:border-box;margin:0;padding:0}
+          body{font-family:Arial,sans-serif;padding:20px;color:#111;font-size:11px}
+          h1{font-size:18px;margin-bottom:2px}
+          .sub{color:#555;font-size:11px;margin-bottom:12px}
+          table{width:100%;border-collapse:collapse;margin-top:8px}
+          th{background:#1a1a2e;color:#fff;padding:7px 6px;text-align:left;font-size:10px;white-space:nowrap}
+          td{padding:6px;border-bottom:1px solid #e5e7eb;vertical-align:top;font-size:10.5px}
+          tr:nth-child(even) td{background:#f9fafb}
+          .total-row td{font-weight:700;background:#f0fdf4;border-top:2px solid #166534}
+          @media print{body{padding:10px}button{display:none}}
+        </style></head><body>
+        <h1>Jiren's Food Product — Orders</h1>
+        <div class="sub">Printed: ${now} &nbsp;|&nbsp; Filter: ${filterDesc} &nbsp;|&nbsp; Showing ${orders.length} order(s)</div>
+        <table>
+          <thead><tr>
+            <th>Order Date</th><th>Order No.</th><th>Customer Name</th><th>Mobile</th>
+            <th>Delivery Address</th><th>Delivery Date</th><th>Items &amp; Qty</th>
+            <th style="text-align:right">Del. Fee</th><th style="text-align:right">Total</th>
+            <th>Payment</th><th>Order Status</th>
+          </tr></thead>
+          <tbody>${rows || '<tr><td colspan="11" style="text-align:center;padding:20px">No orders to display.</td></tr>'}</tbody>
+          <tfoot><tr class="total-row">
+            <td colspan="7">TOTAL — ${orders.length} order(s)</td>
+            <td style="text-align:right">${money(orders.reduce((s, o) => s + Number(o.deliveryFee || 0), 0))}</td>
+            <td style="text-align:right">${money(orders.reduce((s, o) => s + Number(o.total || 0), 0))}</td>
+            <td colspan="2"></td>
+          </tr></tfoot>
+        </table>
+        </body></html>`;
+        const frame = document.createElement('iframe');
+        frame.style.cssText = 'position:fixed;width:0;height:0;border:0;top:0;left:0';
+        document.body.appendChild(frame);
+        frame.contentWindow.document.open();
+        frame.contentWindow.document.write(html);
+        frame.contentWindow.document.close();
+        frame.onload = () => { frame.contentWindow.focus(); frame.contentWindow.print(); setTimeout(() => frame.remove(), 2000); };
+      }
+      function exportOrdersExcel() {
+        requireApiPermission('reports:export');
+        const orders = getAdminFilteredOrders();
+        const esc = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+        const header = ['Order Date','Order No.','Invoice No.','Customer Name','Mobile Number','Fulfillment','Delivery Address','City','Area / Postcode','Delivery Date','Items','Qty (total units)','Delivery Fee','Total Amount','Payment Method','Payment Status','Order Status'];
+        const dataRows = orders.map((o) => {
+          const orderDate = o.createdAt ? new Date(o.createdAt).toLocaleDateString('en-GB') : '';
+          const delivDate = o.deliveryDate ? new Date(o.deliveryDate).toLocaleDateString('en-GB') : '';
+          const itemNames = Array.isArray(o.lineItems) ? o.lineItems.map((i) => `${i.quantity}x ${i.name}`).join('; ') : (o.items || '');
+          const totalUnits = Array.isArray(o.lineItems) ? o.lineItems.reduce((s, i) => s + Number(i.quantity || 0), 0) : '';
+          const isDelivery = (o.fulfillmentMethod || '').toLowerCase() === 'delivery';
+          return [
+            orderDate, o.orderNumber || o.id, o.invoiceNumber || '',
+            o.customer || '', o.phone || '',
+            isDelivery ? 'Delivery' : 'Pickup',
+            isDelivery ? (o.deliveryAddress || '') : '', isDelivery ? (o.deliveryCity || '') : '', isDelivery ? (o.deliveryArea || '') : '',
+            delivDate, itemNames, totalUnits,
+            Number(o.deliveryFee || 0).toFixed(2), Number(o.total || 0).toFixed(2),
+            o.method || '', o.paymentStatus || 'Pending', o.orderStatus || 'Pending'
+          ].map(esc).join(',');
+        });
+        const csv = [header.map(esc).join(','), ...dataRows].join('\n');
+        const filename = `orders-export-${todayInputDate()}.xls`;
+        downloadBlob(filename, csv, 'application/vnd.ms-excel;charset=utf-8');
+        showToast(`Exported ${orders.length} order(s) to ${filename}`);
       }
       /* ── Order detail drawer ─────────────────────── */
       let _currentDrawerOrderId = null;

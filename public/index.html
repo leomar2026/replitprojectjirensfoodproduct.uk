@@ -3201,8 +3201,22 @@
           </select>
           <input id="pem-stock" type="number" min="0" step="1" placeholder="Stock quantity" />
           <input id="pem-reorder" type="number" min="0" step="1" placeholder="Reorder level" />
-          <input id="pem-image-url" placeholder="Image URL" oninput="previewPemImage(this.value)" />
-          <img id="pem-image-preview" style="max-height:100px;display:none;border-radius:7px;border:1px solid var(--line);margin-top:4px" alt="Preview" />
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="pem-image-url" placeholder="Image URL or pick from library below" oninput="previewPemImage(this.value);highlightPemLibrary(this.value)" style="flex:1;min-width:0" />
+            <button class="secondary" type="button" style="white-space:nowrap;font-size:.82rem;padding:0 12px;min-height:36px" onclick="document.getElementById('pem-image-file').click()">&#8593; Upload</button>
+            <input id="pem-image-file" type="file" accept="image/png,image/jpeg,image/jpg,image/webp" hidden onchange="pemUploadImage(event)" />
+          </div>
+          <div id="pem-image-status" class="product-image-status" aria-live="polite" style="margin-top:3px;font-size:.8rem"></div>
+          <img id="pem-image-preview" style="max-height:90px;display:none;border-radius:7px;border:1px solid var(--line);margin-top:6px" alt="Preview" />
+          <div style="margin-top:10px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <span style="font-size:.82rem;color:var(--muted)">Image Library <span id="pem-lib-count" style="color:var(--primary);font-weight:600"></span></span>
+              <button class="secondary" type="button" style="font-size:.75rem;padding:0 8px;min-height:26px" onclick="loadPemImageLibrary()">&#8635; Refresh</button>
+            </div>
+            <div id="pem-image-library" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:6px;max-height:200px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--surface,#f8f9fa)">
+              <div style="text-align:center;color:var(--muted);font-size:.8rem;padding:24px 0;grid-column:1/-1">Loading library…</div>
+            </div>
+          </div>
           <input type="hidden" id="pem-product-id" />
           <button class="primary" type="submit">Save changes</button>
         </form>
@@ -8826,8 +8840,10 @@
         document.getElementById('pem-reorder').value = Number(p.reorderLevel || 0);
         const imgUrl = p.imageUrl || p.image || '';
         document.getElementById('pem-image-url').value = imgUrl;
+        document.getElementById('pem-image-status').textContent = '';
         previewPemImage(imgUrl);
         document.getElementById('product-edit-modal').classList.add('open');
+        loadPemImageLibrary();
       }
       function closeEditProductModal(event) {
         if (!event || event.target.id === 'product-edit-modal' || event.target.closest('.modal-head button')) {
@@ -8840,6 +8856,92 @@
         if (!img) return;
         img.src = url;
         img.style.display = url ? 'block' : 'none';
+      }
+      async function loadPemImageLibrary() {
+        const lib = document.getElementById('pem-image-library');
+        const countEl = document.getElementById('pem-lib-count');
+        if (!lib) return;
+        lib.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:.8rem;padding:24px 0;grid-column:1/-1">Loading…</div>';
+        try {
+          const res = await fetch('/api/admin/products/images', { credentials: 'same-origin' });
+          const images = await res.json();
+          if (countEl) countEl.textContent = images.length ? `(${images.length})` : '';
+          if (!images.length) {
+            lib.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:.8rem;padding:24px 0;grid-column:1/-1">No images yet — click ↑ Upload to add one.</div>';
+            return;
+          }
+          const current = document.getElementById('pem-image-url').value;
+          lib.innerHTML = images.map((url) => {
+            const fname = url.split('/').pop();
+            const sel = url === current;
+            return `<div onclick="selectPemLibImage('${url}')" title="${fname}" style="cursor:pointer;border-radius:6px;overflow:hidden;border:2px solid ${sel ? 'var(--primary,#3b82f6)' : 'var(--line,#e5e7eb)'};aspect-ratio:1;background:#f3f4f6;position:relative" data-lib-url="${url}">
+              <img src="${url}" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" onerror="this.parentElement.style.opacity='.3'" />
+              ${sel ? '<div style="position:absolute;bottom:2px;right:2px;background:var(--primary,#3b82f6);color:#fff;font-size:9px;border-radius:3px;padding:1px 4px">✓</div>' : ''}
+              <button type="button" onclick="event.stopPropagation();deletePemLibImage('${url}',this.parentElement)" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:3px;font-size:10px;padding:1px 5px;cursor:pointer;line-height:1.4">✕</button>
+            </div>`;
+          }).join('');
+        } catch (e) {
+          lib.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:.8rem;padding:12px;grid-column:1/-1">Failed to load library.</div>';
+        }
+      }
+      function selectPemLibImage(url) {
+        document.getElementById('pem-image-url').value = url;
+        previewPemImage(url);
+        highlightPemLibrary(url);
+        document.getElementById('pem-image-status').textContent = 'Image selected.';
+        document.getElementById('pem-image-status').classList.remove('error');
+      }
+      function highlightPemLibrary(url) {
+        document.querySelectorAll('#pem-image-library [data-lib-url]').forEach((el) => {
+          const u = el.getAttribute('data-lib-url');
+          const sel = u === url;
+          el.style.borderColor = sel ? 'var(--primary,#3b82f6)' : 'var(--line,#e5e7eb)';
+          const badge = el.querySelector('div[style*="position:absolute;bottom"]');
+          if (sel && !badge) {
+            const b = document.createElement('div');
+            b.style.cssText = 'position:absolute;bottom:2px;right:2px;background:var(--primary,#3b82f6);color:#fff;font-size:9px;border-radius:3px;padding:1px 4px';
+            b.textContent = '✓';
+            el.appendChild(b);
+          } else if (!sel && badge) badge.remove();
+        });
+      }
+      async function deletePemLibImage(url, thumbEl) {
+        if (!confirm('Remove this image from the library?')) return;
+        const filename = url.split('/').pop();
+        try {
+          const res = await fetch(`/api/admin/products/images/${encodeURIComponent(filename)}`, { method: 'DELETE', credentials: 'same-origin' });
+          if (!res.ok) { const d = await res.json(); alert(d.error || 'Failed to remove.'); return; }
+          if (thumbEl) thumbEl.remove();
+          const remaining = document.querySelectorAll('#pem-image-library [data-lib-url]').length;
+          const countEl = document.getElementById('pem-lib-count');
+          if (countEl) countEl.textContent = remaining ? `(${remaining})` : '';
+          if (!remaining) {
+            document.getElementById('pem-image-library').innerHTML = '<div style="text-align:center;color:var(--muted);font-size:.8rem;padding:24px 0;grid-column:1/-1">No images yet — click ↑ Upload to add one.</div>';
+          }
+          if (document.getElementById('pem-image-url').value === url) {
+            document.getElementById('pem-image-url').value = '';
+            previewPemImage('');
+          }
+        } catch (e) { alert('Network error.'); }
+      }
+      async function pemUploadImage(event) {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (!file) return;
+        const validationError = validateProductImageFile(file);
+        const statusEl = document.getElementById('pem-image-status');
+        if (validationError) { if (statusEl) { statusEl.textContent = validationError; statusEl.classList.add('error'); } return; }
+        if (statusEl) { statusEl.textContent = 'Uploading…'; statusEl.classList.remove('error'); }
+        try {
+          const formData = new FormData();
+          formData.append('image', file);
+          const res = await fetch('/api/admin/products/upload-image', { method: 'POST', credentials: 'same-origin', body: formData });
+          const data = await res.json();
+          if (!res.ok) { if (statusEl) { statusEl.textContent = data.error || 'Upload failed.'; statusEl.classList.add('error'); } return; }
+          if (statusEl) { statusEl.textContent = 'Uploaded!'; statusEl.classList.remove('error'); }
+          await loadPemImageLibrary();
+          selectPemLibImage(data.imageUrl);
+        } catch (e) { if (statusEl) { statusEl.textContent = 'Upload failed. Check connection.'; statusEl.classList.add('error'); } }
       }
       async function saveProductModal(event) {
         event.preventDefault();

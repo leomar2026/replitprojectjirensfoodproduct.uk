@@ -141,6 +141,28 @@ router.put('/products/:id', requireRole('manager', 'admin'), async (req, res) =>
     }
 });
 
+// GET /api/admin/products/images — list all images in the product image library
+router.get('/products/images', requireRole('manager', 'admin'), (req, res) => {
+    try {
+        const files = fs.existsSync(PRODUCT_IMG_DIR)
+            ? fs.readdirSync(PRODUCT_IMG_DIR).filter((f) => /\.(jpg|jpeg|png|webp)$/i.test(f)).sort().reverse()
+            : [];
+        res.json(files.map((f) => `/uploads/products/${f}`));
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to list images.' });
+    }
+});
+
+// DELETE /api/admin/products/images/:filename — remove an image from the library
+router.delete('/products/images/:filename', requireRole('manager', 'admin'), (req, res) => {
+    const filename = path.basename(req.params.filename);
+    if (!filename.match(/^product-[\d]+-[a-f0-9]+\.(jpg|jpeg|png|webp)$/i)) {
+        return res.status(400).json({ error: 'Invalid filename.' });
+    }
+    deleteProductFile(`/uploads/products/${filename}`);
+    res.json({ message: 'Image removed.' });
+});
+
 // POST /api/admin/products/upload-image — pre-upload image before product is created
 router.post('/products/upload-image', requireRole('manager', 'admin'), (req, res, next) => {
     uploadProductImg.single('image')(req, res, (err) => {

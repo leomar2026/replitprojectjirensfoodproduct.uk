@@ -1751,8 +1751,8 @@
               </div>
               <form class="admin-actions" onsubmit="addAdminProduct(event)">
                 <input id="new-product-name" placeholder="Product name" />
-                <input id="new-product-sku" placeholder="SKU / code" />
-                <select id="new-product-category"></select>
+                <input id="new-product-sku" placeholder="Auto-generating…" readonly style="background:#f3f4f6;color:#374151;font-weight:600;cursor:default" title="SKU is auto-generated — edit only if you need a custom code" />
+                <select id="new-product-category" required><option value="">— Select category —</option></select>
                 <input id="new-product-description" placeholder="Description" />
                 <input id="new-product-price" placeholder="Price" type="number" min="0" step="0.01" />
                 <input id="new-product-cost" placeholder="Cost price" type="number" min="0" step="0.01" />
@@ -2916,7 +2916,7 @@
               <p class="admin-note">Managers can add e-commerce items and update online selling/display price, promo price, storefront visibility, stock display status, and e-commerce images. Full product master fields, number series, cost, and deletion remain restricted.</p>
               <form class="admin-actions" onsubmit="addManagerProduct(event)">
                 <input id="manager-new-product-name" placeholder="Product name" />
-                <select id="manager-new-product-category"></select>
+                <select id="manager-new-product-category" required><option value="">— Select category —</option></select>
                 <input id="manager-new-product-description" placeholder="Description" />
                 <input id="manager-new-product-price" placeholder="E-commerce price" type="number" min="0" step="0.01" />
                 <input id="manager-new-product-promo" placeholder="Promo price optional" type="number" min="0" step="0.01" />
@@ -5529,25 +5529,32 @@
         }).join('')
         : '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:28px">No products added yet.</td></tr>';
       }
+      function refreshProductSkuPreview() {
+        const skuField = document.getElementById('new-product-sku');
+        if (!skuField) return;
+        const series = numberSeries.find((s) => s.active && s.documentType.toUpperCase() === 'SKU');
+        if (series) skuField.value = previewSeries(series);
+      }
       function renderProductMasterOptions() {
         const categorySelect = document.getElementById('new-product-category');
         if (categorySelect) {
           const selected = categorySelect.value;
-          categorySelect.innerHTML = categoryMaster
+          categorySelect.innerHTML = '<option value="">— Select category —</option>' + categoryMaster
             .filter((category) => category.active)
-            .map((category) => `<option>${category.name}</option>`)
+            .map((category) => `<option value="${category.name}">${category.name}</option>`)
             .join('');
           if (selected) categorySelect.value = selected;
         }
         const managerCategorySelect = document.getElementById('manager-new-product-category');
         if (managerCategorySelect) {
           const selected = managerCategorySelect.value;
-          managerCategorySelect.innerHTML = categoryMaster
+          managerCategorySelect.innerHTML = '<option value="">— Select category —</option>' + categoryMaster
             .filter((category) => category.active)
-            .map((category) => `<option>${category.name}</option>`)
+            .map((category) => `<option value="${category.name}">${category.name}</option>`)
             .join('');
           if (selected) managerCategorySelect.value = selected;
         }
+        refreshProductSkuPreview();
         const uomSelect = document.getElementById('new-product-uom');
         if (uomSelect) {
           const selected = uomSelect.value || 'pack';
@@ -9154,7 +9161,7 @@
       async function addAdminProduct(event) {
         event.preventDefault();
         const name = document.getElementById('new-product-name').value.trim();
-        const sku = document.getElementById('new-product-sku').value.trim();
+        const skuField = document.getElementById('new-product-sku');
         const category = document.getElementById('new-product-category').value;
         const description = document.getElementById('new-product-description').value.trim();
         const price = Number(document.getElementById('new-product-price').value);
@@ -9169,6 +9176,12 @@
           alert('Please enter a product name and valid price.');
           return;
         }
+        if (!category) {
+          alert('Please select a category.');
+          document.getElementById('new-product-category').focus();
+          return;
+        }
+        const sku = generateDocumentNumber('SKU');
         try {
           const res = await fetch('/api/admin/products', {
             method: 'POST',
@@ -9176,8 +9189,8 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               name,
-              sku: sku || generateDocumentNumber('SKU'),
-              category: category || 'Frozen Products',
+              sku,
+              category,
               pack_display: uom,
               uom,
               price,
@@ -9204,6 +9217,7 @@
         }
         event.target.reset();
         previewNewProductImage('');
+        refreshProductSkuPreview();
         renderProducts();
         renderAdminProducts();
         renderManagerProducts();

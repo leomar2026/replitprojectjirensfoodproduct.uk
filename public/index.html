@@ -10517,11 +10517,17 @@
         };
       }
       function whatsNewCardHtml(ad) {
-        const media = ad.mediaType === 'video' && ad.videoUrl
+        const isVideo = ad.mediaType === 'video' && ad.videoUrl;
+        const isImage = !isVideo && ad.imageUrl;
+        const safeTitle = (ad.title || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        const media = isVideo
           ? `<video class="whats-new-card-media" src="${ad.videoUrl}" muted controls playsinline preload="metadata"></video>`
-          : (ad.imageUrl ? `<img class="whats-new-card-media" src="${ad.imageUrl}" alt="${ad.title}" loading="lazy" decoding="async" />` : '');
+          : (isImage ? `<img class="whats-new-card-media" src="${ad.imageUrl}" alt="${ad.title}" loading="lazy" decoding="async" style="cursor:zoom-in" />` : '');
         const action = ad.buttonText ? `<div class="whats-new-card-actions"><a class="btn dark" href="${ad.buttonLink || '#shop'}">${ad.buttonText}</a></div>` : '';
-        return `<article class="card">${media}<div class="card-body"><div class="sku">WHAT'S NEW</div><h3>${ad.title}</h3><p class="desc">${ad.description}</p>${action}</div></article>`;
+        const clickAttr = isImage
+          ? `onclick="openPreview('${ad.imageUrl}', '${safeTitle}')" style="cursor:zoom-in"`
+          : '';
+        return `<article class="card" ${clickAttr}>${media}<div class="card-body"><div class="sku">WHAT'S NEW</div><h3>${ad.title}</h3><p class="desc">${ad.description}</p>${action}</div></article>`;
       }
       function activeWhatsNewAds() {
         return whatsNewAds.map(normalizeWhatsNewAd).filter((ad) => ad.active).sort((a, b) => a.order - b.order).slice(0, Number(whatsNewLayout || 3));

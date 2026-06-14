@@ -309,8 +309,8 @@ router.post('/', upload.single('payment_proof'), async (req, res) => {
             customer_name: customer_name.trim(),
             total_amount: totalAmount,
             payment_method,
-            ice_pack_qty: icePack.requiredQty,
-            ice_pack_weight: icePack.totalWeight,
+            ice_pack_qty: packaging.weightKg > 0 ? 1 : 0,
+            ice_pack_weight: packaging.weightKg,
             has_idempotency_key: !!idempotency_key
         });
 

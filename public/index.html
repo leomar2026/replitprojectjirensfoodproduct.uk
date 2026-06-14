@@ -1639,7 +1639,7 @@
                 <div class="menu-group">
                   <div class="menu-group-title">Sales & Orders</div>
                   <div class="sidebar-menu">
-                    <button data-icon="O" data-admin-nav="admin-orders" onclick="showAdminPage('admin-orders')">Orders</button>
+                    <button data-icon="O" data-admin-nav="admin-orders" onclick="showAdminPage('admin-orders');clearOrderNotifBadge()">Orders <span id="order-notif-badge" style="display:none;background:#ef4444;color:#fff;border-radius:10px;font-size:.68rem;padding:1px 7px;margin-left:3px;font-weight:800;vertical-align:middle"></span></button>
                     <button data-icon="S" data-admin-nav="admin-sales-transactions" onclick="showAdminPage('admin-sales-transactions')">Sales Transactions</button>
                     <button data-icon="POS" data-admin-nav="admin-pos" onclick="showAdminPage('admin-pos')">POS</button>
                   </div>
@@ -2676,7 +2676,7 @@
                   <div class="sidebar-menu">
                     <button class="is-active" data-cashier-nav="cashier-overview-section" onclick="showCashierSection('cashier-overview-section')">Dashboard</button>
                     <button data-cashier-nav="cashier-pos-section" onclick="showCashierSection('cashier-pos-section')">POS</button>
-                    <button data-cashier-nav="cashier-orders-section" onclick="showCashierSection('cashier-orders-section')">Orders</button>
+                    <button data-cashier-nav="cashier-orders-section" onclick="showCashierSection('cashier-orders-section');clearOrderNotifBadge()">Orders <span id="order-notif-badge-csh" style="display:none;background:#ef4444;color:#fff;border-radius:10px;font-size:.68rem;padding:1px 7px;margin-left:3px;font-weight:800;vertical-align:middle"></span></button>
                     <button data-cashier-nav="cashier-transactions-section" onclick="showCashierSection('cashier-transactions-section')">Sales Transactions</button>
                     <button data-cashier-nav="cashier-sales-report-section" onclick="showCashierSection('cashier-sales-report-section')">Sales Report</button>
                   </div>
@@ -2796,7 +2796,7 @@
                   <div class="sidebar-menu">
                     <button class="is-active" data-manager-nav="manager-overview" onclick="showManagerPage('manager-overview')">Dashboard</button>
                     <button data-manager-nav="manager-pos" onclick="showManagerPage('manager-pos')">POS</button>
-                    <button data-manager-nav="manager-orders" onclick="showManagerPage('manager-orders')">Orders</button>
+                    <button data-manager-nav="manager-orders" onclick="showManagerPage('manager-orders');clearOrderNotifBadge()">Orders <span id="order-notif-badge-mgr" style="display:none;background:#ef4444;color:#fff;border-radius:10px;font-size:.68rem;padding:1px 7px;margin-left:3px;font-weight:800;vertical-align:middle"></span></button>
                     <button data-manager-nav="manager-sales" onclick="showManagerPage('manager-sales')">Sales Transactions</button>
                     <button data-manager-nav="manager-invoices" onclick="showManagerPage('manager-invoices')">Invoices</button>
                     <button data-manager-nav="manager-ecommerce-pricing" onclick="showManagerPage('manager-ecommerce-pricing')">Items / E-commerce Pricing</button>
@@ -3586,6 +3586,56 @@
         toast.textContent = message;
         container.appendChild(toast);
         setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 400); }, 3000);
+      }
+
+      /* ── New-order notification polling ─────────────────────── */
+      let _orderNotifCount = 0;
+      let _orderNotifLastId = null;
+      let _orderNotifInterval = null;
+      function _setOrderBadges(n) {
+        ['order-notif-badge','order-notif-badge-mgr','order-notif-badge-csh'].forEach((id) => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          if (n > 0) { el.textContent = n > 99 ? '99+' : String(n); el.style.display = 'inline-block'; }
+          else { el.textContent = ''; el.style.display = 'none'; }
+        });
+      }
+      function clearOrderNotifBadge() {
+        _orderNotifCount = 0;
+        _setOrderBadges(0);
+      }
+      async function _pollNewOrders() {
+        if (!['admin','manager','cashier'].includes(currentUserRole)) return;
+        try {
+          const res = await fetch('/api/admin/orders', { credentials: 'same-origin' });
+          if (!res.ok) return;
+          const orders = await res.json();
+          if (!orders.length) return;
+          const latestId = orders[0].id;
+          if (_orderNotifLastId === null) { _orderNotifLastId = latestId; return; }
+          if (latestId !== _orderNotifLastId) {
+            const newCount = orders.filter((o) => o.id > _orderNotifLastId).length;
+            if (newCount > 0) {
+              _orderNotifCount += newCount;
+              _orderNotifLastId = latestId;
+              _setOrderBadges(_orderNotifCount);
+              const label = newCount === 1 ? '1 new order received!' : `${newCount} new orders received!`;
+              showToast('🛒 ' + label, 'success');
+              submittedOrders = orders.map(mapApiOrderToFrontend);
+              filterAdminOrders();
+            }
+          }
+        } catch (e) { /* silent — network blip */ }
+      }
+      function startOrderNotificationPolling() {
+        if (_orderNotifInterval) clearInterval(_orderNotifInterval);
+        _orderNotifLastId = null;
+        _orderNotifCount = 0;
+        _pollNewOrders();
+        _orderNotifInterval = setInterval(_pollNewOrders, 30000);
+      }
+      function stopOrderNotificationPolling() {
+        if (_orderNotifInterval) { clearInterval(_orderNotifInterval); _orderNotifInterval = null; }
       }
 
       async function initWhatsNewAdsFromApi(useAdminEndpoint = false) {
@@ -4809,6 +4859,7 @@
         renderBannerManager();
         renderBannerSlider();
         renderWhatsNew();
+        startOrderNotificationPolling();
       }
       async function loadDatabaseAndRender() {
         try {
@@ -6346,10 +6397,6 @@
             <div style="font-size:.88rem;color:#374151;margin-bottom:4px">${order.phone || ''}</div>
             ${addrLines.map((line, i) => `<div style="font-size:${i === 0 ? '.93' : '.86'}rem;color:#1f2937;${i === 0 ? 'font-weight:600' : ''}">${line}</div>`).join('')}
             ${!addrLines.length ? '<div style="color:#9ca3af;font-style:italic;font-size:.85rem">No address provided</div>' : ''}
-            <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-              <button type="button" onclick="navigator.clipboard.writeText(${JSON.stringify(shippingLabel)}).then(()=>showToast('Address copied!'))" style="font-size:.75rem;padding:4px 10px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600">📋 Copy address</button>
-              ${order.phone ? `<a href="tel:${order.phone}" style="font-size:.75rem;padding:4px 10px;background:#16a34a;color:#fff;border-radius:6px;text-decoration:none;font-weight:600">📞 Call customer</a>` : ''}
-            </div>
           </div>
           <div class="detail-grid" style="margin-bottom:20px">
             ${_df('Delivery Date', delivDate)}

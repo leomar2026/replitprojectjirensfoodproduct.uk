@@ -152,7 +152,7 @@ app.get('/api/orders/today-count', async (req, res) => {
 app.get('/api/settings', async (req, res) => {
     try {
         const result = await pool.query(
-            "SELECT key, value FROM app_settings WHERE key LIKE 'site_%' OR key LIKE 'banner_%' OR key LIKE 'footer_%' OR key LIKE 'ice_pack_%' OR key LIKE 'daily_%' OR key LIKE 'delivery_%' OR key='whats_new_layout' OR key='section_order' OR key='large_order_contact_message' OR key='site_service' OR key='pickup_enabled' OR key='delivery_enabled'"
+            "SELECT key, value FROM app_settings WHERE key LIKE 'site_%' OR key LIKE 'banner_%' OR key LIKE 'footer_%' OR key LIKE 'ice_pack_%' OR key LIKE 'daily_%' OR key LIKE 'delivery_%' OR key='whats_new_layout' OR key='section_order' OR key='large_order_contact_message' OR key='large_order_max_packs' OR key='site_service' OR key='pickup_enabled' OR key='delivery_enabled'"
         );
         const settings = {};
         result.rows.forEach(r => { settings[r.key] = r.value; });
@@ -255,5 +255,6 @@ app.listen(PORT, HOST, async () => {
     if (dbOk) {
         pool.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_date DATE').catch(() => {});
         pool.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_email VARCHAR(255)').catch(() => {});
+        pool.query("INSERT INTO app_settings (key, value) VALUES ('large_order_max_packs','11') ON CONFLICT (key) DO NOTHING").catch(() => {});
     }
 });

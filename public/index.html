@@ -2199,12 +2199,15 @@
               <div class="product-table-wrap"><table><thead><tr><th>Type</th><th>Min</th><th>Max</th><th>Fee</th><th>Status</th><th>Action</th></tr></thead><tbody id="delivery-fee-rows"></tbody></table></div>
               <div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--line)">
                 <div class="eyebrow" style="margin-bottom:4px">Master Data</div>
-                <h3 style="margin:0 0 12px">Large Order Contact Message</h3>
-                <p style="font-size:.85rem;color:var(--muted);margin:0 0 12px">This message is shown in a popup when a customer tries to checkout with 11 or more packs.</p>
-                <form class="admin-actions" onsubmit="saveLargeOrderMessage(event)" style="grid-template-columns:1fr auto">
+                <h3 style="margin:0 0 8px">Large Order Settings</h3>
+                <p style="font-size:.85rem;color:var(--muted);margin:0 0 12px">When a customer's total packs reach the limit, checkout is blocked and the message below is shown. Set the limit to <strong>0</strong> to disable the block.</p>
+                <form class="admin-actions" onsubmit="saveLargeOrderSettings(event)" style="grid-template-columns:auto 1fr auto;align-items:end">
+                  <label style="display:flex;flex-direction:column;gap:4px;font-size:.8rem;font-weight:600;color:var(--muted)">Block at (total pcs)
+                    <input id="large-order-max-packs-input" type="number" min="0" step="1" placeholder="e.g. 11" style="font-size:.95rem;width:120px;padding:10px;border:1px solid var(--line);border-radius:8px" />
+                  </label>
                   <textarea id="large-order-message-input" rows="3" placeholder="e.g. For orders of 11 packs or more, please call us at +44 7000 000000 to arrange delivery." style="font-size:.95rem;padding:10px;border:1px solid var(--line);border-radius:8px;resize:vertical"></textarea>
                   <label style="display:flex;flex-direction:column;gap:4px;font-size:.8rem;font-weight:600;color:transparent">‎
-                    <button class="primary" type="submit" style="height:44px">Save message</button>
+                    <button class="primary" type="submit" style="height:44px">Save</button>
                   </label>
                 </form>
               </div>
@@ -3557,7 +3560,8 @@
           applyDeliveryScheduleToAdminUI();
           fetchTodayOrderCount();
           if (d.whats_new_layout) whatsNewLayout = d.whats_new_layout;
-          if (d.large_order_contact_message) largeOrderContactMessage = d.large_order_contact_message;
+          if (d.large_order_contact_message) { largeOrderContactMessage = d.large_order_contact_message; const el=document.getElementById('large-order-message-input'); if(el) el.value=largeOrderContactMessage; }
+          if (d.large_order_max_packs !== undefined) { largeOrderMaxPacks = Math.max(0, parseInt(d.large_order_max_packs,10)||0); const el=document.getElementById('large-order-max-packs-input'); if(el) el.value=largeOrderMaxPacks; }
           if (d.section_order) {
             try {
               const order = JSON.parse(d.section_order);
@@ -3756,7 +3760,8 @@
           }
           if (appSettingsRes.ok) {
             const d = await appSettingsRes.json();
-            if (d.large_order_contact_message) largeOrderContactMessage = d.large_order_contact_message;
+            if (d.large_order_contact_message) { largeOrderContactMessage = d.large_order_contact_message; const el=document.getElementById('large-order-message-input'); if(el) el.value=largeOrderContactMessage; }
+            if (d.large_order_max_packs !== undefined) { largeOrderMaxPacks = Math.max(0, parseInt(d.large_order_max_packs,10)||0); const el=document.getElementById('large-order-max-packs-input'); if(el) el.value=largeOrderMaxPacks; }
           }
           const expRes = await fetch('/api/admin/expenses?limit=500', { credentials: 'same-origin' });
           if (expRes.ok) {
@@ -3796,6 +3801,7 @@
       let pickupEnabled = true;
       let deliveryEnabled = true;
       let largeOrderContactMessage = 'For orders of 11 packs or more, please call us to arrange delivery.';
+      let largeOrderMaxPacks = 11;
       let deliveryDays = [1, 3];
       let deliveryBufferDays = 7;
       let deliveryNotice = 'Deliveries are available every Monday and Wednesday only.\n\nPlease allow at least 1 week preparation time before delivery.\n\nThe earliest available delivery date will be automatically calculated based on our delivery schedule.';
@@ -5279,8 +5285,9 @@
           alert('Please add products to cart first.');
           return;
         }
-        const { contactRequired } = orderTotals(cart, selectedCheckoutMethod());
-        if (contactRequired) {
+        const { contactRequired, totalFrozenPacks: checkoutPacks } = orderTotals(cart, selectedCheckoutMethod());
+        const isLargeOrder = largeOrderMaxPacks > 0 && checkoutPacks >= largeOrderMaxPacks;
+        if (contactRequired || isLargeOrder) {
           const modal = document.getElementById('large-order-modal');
           const msgEl = document.getElementById('large-order-modal-text');
           if (msgEl) msgEl.textContent = largeOrderContactMessage;
@@ -9522,21 +9529,29 @@
           showToast('Packaging settings saved.');
         } catch (e) { showToast('Network error saving packaging settings.', 'error'); }
       }
-      async function saveLargeOrderMessage(event) {
+      async function saveLargeOrderSettings(event) {
         event.preventDefault();
-        const value = document.getElementById('large-order-message-input').value.trim();
-        if (!value) { alert('Please enter a message.'); return; }
+        const maxPacks = parseInt(document.getElementById('large-order-max-packs-input')?.value || '0', 10);
+        const message = document.getElementById('large-order-message-input').value.trim();
+        if (!message) { showToast('Please enter a contact message.', 'error'); return; }
         try {
-          const res = await fetch('/api/admin/master/settings/app-settings', {
-            method: 'POST', credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ key: 'large_order_contact_message', value })
-          });
-          const data = await res.json();
-          if (!res.ok) { alert(data.error || 'Failed to save message.'); return; }
-          largeOrderContactMessage = value;
-          alert('Message saved successfully.');
-        } catch (e) { alert('Network error saving message.'); }
+          const [r1, r2] = await Promise.all([
+            fetch('/api/admin/master/settings/app-settings', {
+              method: 'POST', credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ key: 'large_order_max_packs', value: String(isNaN(maxPacks) ? 11 : maxPacks) })
+            }),
+            fetch('/api/admin/master/settings/app-settings', {
+              method: 'POST', credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ key: 'large_order_contact_message', value: message })
+            })
+          ]);
+          if (!r1.ok || !r2.ok) { showToast('Failed to save settings.', 'error'); return; }
+          largeOrderMaxPacks = Math.max(0, isNaN(maxPacks) ? 11 : maxPacks);
+          largeOrderContactMessage = message;
+          showToast('Large order settings saved.');
+        } catch (e) { showToast('Network error saving settings.', 'error'); }
       }
       async function toggleDeliveryFeeRule(id) {
         try {

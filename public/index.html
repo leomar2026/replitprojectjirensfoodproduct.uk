@@ -1521,10 +1521,10 @@
               <div style="display:flex; justify-content:space-between"><strong id="cart-tax-label">VAT 15%</strong><span id="cart-vat">£0.00</span></div>
               <div style="display:flex; justify-content:space-between"><strong id="cart-weight-label">Total weight</strong><span id="cart-weight">0.00 kg</span></div>
               <div id="cart-ice-breakdown" style="display:none;background:#f0f9ff;border-radius:8px;padding:10px 12px;font-size:.83rem;border:1px solid #bae6fd;margin-top:2px;margin-bottom:2px">
-                <div style="font-weight:700;color:#0c4a6e;margin-bottom:6px">🧊 Ice Pack (Delivery Protection)</div>
+                <div style="font-weight:700;color:#0c4a6e;margin-bottom:6px">📦 Packaging (Box, Ice Pack &amp; Insulator)</div>
                 <div style="display:flex;justify-content:space-between;margin-bottom:3px;color:#0c4a6e"><span>Frozen packs ordered</span><span id="cart-frozen-packs">0</span></div>
-                <div style="display:flex;justify-content:space-between;margin-bottom:3px;color:#0c4a6e"><span>Required ice packs</span><span id="cart-ice-pack-qty">0</span></div>
-                <div style="display:flex;justify-content:space-between;margin-bottom:3px;color:#0c4a6e"><span>Ice pack weight added</span><span id="cart-ice-pack-weight">0.000 kg</span></div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:3px;color:#0c4a6e"><span>Packaging units</span><span id="cart-ice-pack-qty">1</span></div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:3px;color:#0c4a6e"><span>Packaging weight added</span><span id="cart-ice-pack-weight">0.000 kg</span></div>
                 <div style="display:flex;justify-content:space-between;font-weight:700;color:#0c4a6e;border-top:1px solid #bae6fd;padding-top:6px;margin-top:3px"><span>Total delivery weight</span><span id="cart-total-delivery-weight">0.000 kg</span></div>
               </div>
               <div style="display:flex; justify-content:space-between"><strong>Delivery</strong><span id="cart-delivery">£0.00</span></div>
@@ -1557,6 +1557,7 @@
               <input required id="checkout-date" type="date" readonly aria-readonly="true" />
               <input required id="checkout-name" placeholder="Full name" />
               <input required id="checkout-phone" placeholder="Contact number" />
+              <input required id="checkout-email" type="email" placeholder="Email address" />
               <input class="delivery-field" id="checkout-address" placeholder="Delivery address" />
               <input class="delivery-field" id="checkout-city" placeholder="City" />
               <input class="delivery-field" id="checkout-area" placeholder="Area / postcode" />
@@ -1568,7 +1569,7 @@
                 <small id="delivery-date-error" style="display:none;color:#dc2626;font-weight:600"></small>
               </div>
               <div id="ice-pack-notice" style="display:none;padding:10px 12px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;font-size:.82rem;color:#0c4a6e;line-height:1.5;margin-top:-4px">
-                🧊 <strong>Ice pack delivery protection:</strong> Frozen delivery orders require ice packs to protect your items during shipment. Ice pack weight is added to the total delivery weight and may affect the delivery fee.
+                📦 <strong>Packaging included:</strong> A packaging kit (box, ice pack &amp; insulator) is added to all frozen delivery orders. Packaging weight is added to the total delivery weight and may affect the delivery fee.
               </div>
               <select required id="checkout-payment" onchange="togglePaymentInstructions()">
                 <option value="cash_on_delivery">Cash on Delivery</option>
@@ -2225,29 +2226,30 @@
               </div>
               <div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--line)">
                 <div class="eyebrow" style="margin-bottom:4px">Delivery Settings</div>
-                <h3 style="margin:0 0 8px">Ice Pack Protection Settings</h3>
-                <p style="font-size:.85rem;color:var(--muted);margin:0 0 12px">Ice packs are mandatory delivery protection for frozen orders. They add weight to the delivery calculation and may change the delivery fee tier, but are <strong>not charged</strong> as a separate product line item.</p>
-                <form class="admin-actions" onsubmit="saveIcePackSettings(event)" style="grid-template-columns:repeat(auto-fill,minmax(165px,1fr))">
-                  <label style="display:flex;flex-direction:column;gap:4px;font-size:.8rem;font-weight:600;color:var(--muted)">Status
-                    <select id="ice-pack-enabled" style="font-size:.95rem"><option value="true">Enabled</option><option value="false">Disabled</option></select>
+                <h3 style="margin:0 0 8px">Packaging (Box, Ice Pack &amp; Insulator)</h3>
+                <p style="font-size:.85rem;color:var(--muted);margin:0 0 12px">Define packaging weight tiers based on the number of frozen items ordered. The matched tier's weight is added to the total delivery weight and included in the delivery fee calculation.</p>
+                <form onsubmit="savePackagingSettings(event)">
+                  <label style="display:flex;flex-direction:column;gap:4px;font-size:.8rem;font-weight:600;color:var(--muted);max-width:220px;margin-bottom:14px">Status
+                    <select id="packaging-enabled" style="font-size:.95rem"><option value="true">Enabled</option><option value="false">Disabled</option></select>
                   </label>
-                  <label style="display:flex;flex-direction:column;gap:4px;font-size:.8rem;font-weight:600;color:var(--muted)">Weight per ice pack (kg)
-                    <input id="ice-pack-weight" type="number" min="0" step="0.1" placeholder="e.g. 0.5" />
-                  </label>
-                  <label style="display:flex;flex-direction:column;gap:4px;font-size:.8rem;font-weight:600;color:var(--muted)">Frozen packs per ice pack
-                    <input id="ice-pack-packs-per-piece" type="number" min="1" step="1" placeholder="e.g. 2" />
-                  </label>
-                  <label style="display:flex;flex-direction:column;gap:4px;font-size:.8rem;font-weight:600;color:var(--muted)">Minimum ice packs
-                    <input id="ice-pack-min-qty" type="number" min="0" step="1" placeholder="e.g. 1" />
-                  </label>
-                  <label style="display:flex;flex-direction:column;gap:4px;font-size:.8rem;font-weight:600;color:var(--muted)">Description
-                    <input id="ice-pack-description" placeholder="e.g. Cold protection packaging" />
-                  </label>
-                  <label style="display:flex;flex-direction:column;gap:4px;font-size:.8rem;font-weight:600;color:transparent">‎
-                    <button class="primary" type="submit" style="height:44px">Save ice pack settings</button>
-                  </label>
+                  <div style="overflow-x:auto;margin-bottom:12px">
+                    <table style="width:100%;border-collapse:collapse;font-size:.85rem">
+                      <thead><tr style="background:#f9fafb">
+                        <th style="text-align:left;padding:8px 10px;border:1px solid var(--line);font-size:.78rem;color:var(--muted)">Tier</th>
+                        <th style="text-align:left;padding:8px 10px;border:1px solid var(--line);font-size:.78rem;color:var(--muted)">From (pcs)</th>
+                        <th style="text-align:left;padding:8px 10px;border:1px solid var(--line);font-size:.78rem;color:var(--muted)">To (pcs, blank = no limit)</th>
+                        <th style="text-align:left;padding:8px 10px;border:1px solid var(--line);font-size:.78rem;color:var(--muted)">Packaging Weight (kg)</th>
+                        <th style="padding:8px 10px;border:1px solid var(--line)"></th>
+                      </tr></thead>
+                      <tbody id="packaging-tiers-body"></tbody>
+                    </table>
+                  </div>
+                  <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <button type="button" class="secondary" onclick="addPackagingTierRow()" style="height:38px">+ Add tier</button>
+                    <button type="submit" class="primary" style="height:38px">Save packaging settings</button>
+                  </div>
+                  <div id="packaging-rule-preview" style="display:none;margin-top:10px;font-size:.83rem;color:#0c4a6e;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px 12px"></div>
                 </form>
-                <div id="ice-pack-rule-preview" style="display:none;margin-top:10px;font-size:.83rem;color:#0c4a6e;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px 12px"></div>
               </div>
               <div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--line)">
                 <div class="eyebrow" style="margin-bottom:4px">Delivery Settings</div>
@@ -3373,6 +3375,7 @@
           deliveryNumber: o.delivery_number || '',
           customer: o.customer_name,
           phone: o.customer_phone,
+          email: o.customer_email || '',
           fulfillmentMethod: o.fulfillment_method || 'pickup',
           deliveryDate: o.delivery_date || '',
           deliveryAddress: o.delivery_address || '',
@@ -3540,11 +3543,6 @@
           if (d.banner_speed) bannerSpeed = Math.max(1500, Number(d.banner_speed)||4500);
           if (d.banner_show_arrows !== undefined) bannerShowArrows = d.banner_show_arrows === 'true';
           if (d.banner_show_dots   !== undefined) bannerShowDots   = d.banner_show_dots   === 'true';
-          if (d.ice_pack_enabled   !== undefined) { icePackSettings.enabled = d.ice_pack_enabled !== 'false'; const e=document.getElementById('ice-pack-enabled'); if(e) e.value=String(icePackSettings.enabled); }
-          if (d.ice_pack_weight_kg)         { icePackSettings.weightKg      = parseFloat(d.ice_pack_weight_kg)||0.5;               const e=document.getElementById('ice-pack-weight');          if(e) e.value=icePackSettings.weightKg; }
-          if (d.ice_pack_packs_per_piece)   { icePackSettings.packsPerPiece = Math.max(1,parseInt(d.ice_pack_packs_per_piece,10)||2); const e=document.getElementById('ice-pack-packs-per-piece'); if(e) e.value=icePackSettings.packsPerPiece; }
-          if (d.ice_pack_min_qty !== undefined) { icePackSettings.minQty    = Math.max(0,parseInt(d.ice_pack_min_qty,10)||1);        const e=document.getElementById('ice-pack-min-qty');         if(e) e.value=icePackSettings.minQty; }
-          if (d.ice_pack_description)       { icePackSettings.description   = d.ice_pack_description;                               const e=document.getElementById('ice-pack-description');      if(e) e.value=d.ice_pack_description; }
           if (d.pickup_enabled !== undefined)   { pickupEnabled   = d.pickup_enabled   !== 'false'; const e=document.getElementById('fulfillment-pickup-enabled');   if(e) e.value=String(pickupEnabled); }
           if (d.delivery_enabled !== undefined) { deliveryEnabled = d.delivery_enabled !== 'false'; const e=document.getElementById('fulfillment-delivery-enabled'); if(e) e.value=String(deliveryEnabled); }
           applyFulfillmentSettings();
@@ -3685,12 +3683,12 @@
       async function initMasterDataFromApi() {
         if (!['admin', 'manager', 'cashier'].includes(currentUserRole)) return;
         try {
-          const [taxRes, currRes, delivRes, bankRes, icePackRes] = await Promise.all([
+          const [taxRes, currRes, delivRes, bankRes, packagingRes] = await Promise.all([
             fetch('/api/admin/master/settings/tax', { credentials: 'same-origin' }),
             fetch('/api/admin/master/settings/currency', { credentials: 'same-origin' }),
             fetch('/api/admin/master/settings/delivery-fee', { credentials: 'same-origin' }),
             fetch('/api/admin/master/settings/bank', { credentials: 'same-origin' }),
-            fetch('/api/admin/master/settings/ice-pack', { credentials: 'same-origin' })
+            fetch('/api/admin/master/settings/packaging', { credentials: 'same-origin' })
           ]);
           if (taxRes.ok) {
             const d = await taxRes.json();
@@ -3710,14 +3708,13 @@
             const d = await bankRes.json();
             bankDetails = { bankName: d.bank_name || '', accountName: d.account_name || '', accountNumber: d.account_number || '', qrCodeImage: d.qr_code_image || '', active: d.active !== false };
           }
-          if (icePackRes.ok) {
-            const d = await icePackRes.json();
-            icePackSettings = { enabled: d.enabled !== false, weightKg: Number(d.weight_kg || 0.5), packsPerPiece: Math.max(1, Number(d.packs_per_piece || 2)), minQty: Math.max(0, Number(d.min_qty || 1)), description: d.description || '' };
-            const e1=document.getElementById('ice-pack-enabled');        if(e1) e1.value=String(icePackSettings.enabled);
-            const e2=document.getElementById('ice-pack-weight');         if(e2) e2.value=icePackSettings.weightKg;
-            const e3=document.getElementById('ice-pack-packs-per-piece');if(e3) e3.value=icePackSettings.packsPerPiece;
-            const e4=document.getElementById('ice-pack-min-qty');        if(e4) e4.value=icePackSettings.minQty;
-            const e5=document.getElementById('ice-pack-description');    if(e5) e5.value=icePackSettings.description;
+          if (packagingRes.ok) {
+            const d = await packagingRes.json();
+            packagingEnabled = d.enabled !== false;
+            if (Array.isArray(d.rules) && d.rules.length) packagingRules = d.rules;
+            const pe = document.getElementById('packaging-enabled');
+            if (pe) pe.value = String(packagingEnabled);
+            renderPackagingTiers();
           }
           const [catRes, uomRes, vendRes, expCatRes, promoRes, usersRes, numSeriesRes, appSettingsRes] = await Promise.all([
             fetch('/api/admin/master/categories', { credentials: 'same-origin' }),
@@ -3793,6 +3790,8 @@
         { id: 2, minWeight: 2.01, maxWeight: 20, fee: 5.55, currency: 'GBP', active: true, feeType: 'KG', contactRequired: false },
         { id: 3, minWeight: 20.01, maxWeight: 30, fee: 11.95, currency: 'GBP', active: true, feeType: 'KG', contactRequired: false }
       ];
+      let packagingRules = [{ minPcs: 1, maxPcs: 2, weightKg: 0.700 }, { minPcs: 3, maxPcs: null, weightKg: 1.000 }];
+      let packagingEnabled = true;
       let icePackSettings = { enabled: true, weightKg: 0.5, packsPerPiece: 2, minQty: 1, description: 'Cold protection packaging for frozen items' };
       let pickupEnabled = true;
       let deliveryEnabled = true;
@@ -4415,13 +4414,13 @@
         const subtotal = lines.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0);
         const productWeight = calculateCartWeight(lines);
         const totalFrozenPacks = lines.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
-        let icePack = { requiredQty: 0, weightKg: 0 };
-        if (fulfillmentMethod === 'delivery' && icePackSettings.enabled && totalFrozenPacks > 0 && subtotal > 0) {
-          const rawQty = Math.ceil(totalFrozenPacks / Math.max(1, Number(icePackSettings.packsPerPiece)));
-          const requiredQty = Math.max(rawQty, Number(icePackSettings.minQty) || 1);
-          icePack = { requiredQty, weightKg: parseFloat((requiredQty * Number(icePackSettings.weightKg || 0.5)).toFixed(3)) };
+        let packaging = { weightKg: 0 };
+        if (fulfillmentMethod === 'delivery' && packagingEnabled && totalFrozenPacks > 0 && subtotal > 0) {
+          const pkgRule = packagingRules.find(r => totalFrozenPacks >= Number(r.minPcs) && (r.maxPcs === '' || r.maxPcs == null || totalFrozenPacks <= Number(r.maxPcs)));
+          if (pkgRule) packaging = { weightKg: parseFloat(Number(pkgRule.weightKg).toFixed(3)) };
         }
-        const totalWeight = parseFloat((productWeight + (fulfillmentMethod === 'delivery' ? icePack.weightKg : 0)).toFixed(3));
+        const icePack = { requiredQty: packaging.weightKg > 0 ? 1 : 0, weightKg: packaging.weightKg };
+        const totalWeight = parseFloat((productWeight + (fulfillmentMethod === 'delivery' ? packaging.weightKg : 0)).toFixed(3));
         const activePackRules = deliveryFeeRules.filter((r) => r.active && (r.feeType || 'KG') === 'PACK');
         const packQty = calculatePackQuantity(lines);
         const packResult = activePackRules.length > 0 && packQty > 0 && fulfillmentMethod === 'delivery' ? calculateDeliveryFeeByPack(packQty) : null;
@@ -4436,7 +4435,7 @@
         const vatRate = taxVatSetup.active === false ? 0 : Number(taxVatSetup.rate || 0) / 100;
         const vat = taxableSubtotal * vatRate;
         const deliveryFee = promotion.freeDelivery ? 0 : baseDeliveryFee;
-        return { subtotal, vat, productWeight, totalWeight, deliveryFee, baseDeliveryFee, discountAmount, promotion, grandTotal: taxableSubtotal + vat + deliveryFee, contactRequired, packQty, icePack, totalFrozenPacks };
+        return { subtotal, vat, productWeight, totalWeight, deliveryFee, baseDeliveryFee, discountAmount, promotion, grandTotal: taxableSubtotal + vat + deliveryFee, contactRequired, packQty, icePack, packaging, totalFrozenPacks };
       }
       function bytesToBase64(bytes) {
         return btoa(String.fromCharCode(...new Uint8Array(bytes)));
@@ -4927,9 +4926,9 @@
             </div>
           `).join('');
         }
-        const { subtotal, vat, productWeight, totalWeight, deliveryFee, discountAmount, promotion, grandTotal, contactRequired, packQty, icePack, totalFrozenPacks } = orderTotals(cart, selectedCheckoutMethod());
+        const { subtotal, vat, productWeight, totalWeight, deliveryFee, discountAmount, promotion, grandTotal, contactRequired, packQty, icePack, packaging, totalFrozenPacks } = orderTotals(cart, selectedCheckoutMethod());
         const isDelivery = selectedCheckoutMethod() === 'delivery';
-        const showIcePack = isDelivery && icePackSettings.enabled && icePack.requiredQty > 0;
+        const showIcePack = isDelivery && packagingEnabled && packaging.weightKg > 0;
         document.getElementById('cart-subtotal').textContent = money(subtotal);
         document.getElementById('cart-vat').textContent = money(vat);
         const cartWeightLabel = document.getElementById('cart-weight-label');
@@ -4947,7 +4946,7 @@
           }
         }
         const icePackNotice = document.getElementById('ice-pack-notice');
-        if (icePackNotice) icePackNotice.style.display = isDelivery && icePackSettings.enabled ? '' : 'none';
+        if (icePackNotice) icePackNotice.style.display = isDelivery && packagingEnabled ? '' : 'none';
         document.getElementById('cart-delivery').textContent = contactRequired ? 'Contact required' : money(deliveryFee);
         const deliveryNote = document.getElementById('cart-delivery-note');
         if (deliveryNote) {
@@ -5489,6 +5488,7 @@
         const formData = new FormData();
         formData.append('customer_name', document.getElementById('checkout-name').value.trim());
         formData.append('customer_phone', document.getElementById('checkout-phone').value.trim());
+        formData.append('customer_email', document.getElementById('checkout-email')?.value?.trim() || '');
         formData.append('fulfillment_method', document.getElementById('checkout-method').value);
         formData.append('delivery_address', document.getElementById('checkout-address')?.value?.trim() || '');
         formData.append('delivery_city', document.getElementById('checkout-city')?.value?.trim() || '');
@@ -6268,6 +6268,7 @@
             <td>${o.orderNumber || o.id}</td>
             <td>${o.customer || '–'}</td>
             <td>${o.phone || '–'}</td>
+            <td>${o.email || '–'}</td>
             <td>${isDelivery ? addr : '<em>Pickup</em>'}</td>
             <td>${isDelivery ? delivDate : '–'}</td>
             <td style="text-align:left">${itemsList}</td>
@@ -6294,14 +6295,14 @@
         <div class="sub">Printed: ${now} &nbsp;|&nbsp; Filter: ${filterDesc} &nbsp;|&nbsp; Showing ${orders.length} order(s)</div>
         <table>
           <thead><tr>
-            <th>Order Date</th><th>Order No.</th><th>Customer Name</th><th>Mobile</th>
+            <th>Order Date</th><th>Order No.</th><th>Customer Name</th><th>Mobile</th><th>Email</th>
             <th>Delivery Address</th><th>Delivery Date</th><th>Items &amp; Qty</th>
             <th style="text-align:right">Del. Fee</th><th style="text-align:right">Total</th>
             <th>Payment</th><th>Order Status</th>
           </tr></thead>
-          <tbody>${rows || '<tr><td colspan="11" style="text-align:center;padding:20px">No orders to display.</td></tr>'}</tbody>
+          <tbody>${rows || '<tr><td colspan="12" style="text-align:center;padding:20px">No orders to display.</td></tr>'}</tbody>
           <tfoot><tr class="total-row">
-            <td colspan="7">TOTAL — ${orders.length} order(s)</td>
+            <td colspan="8">TOTAL — ${orders.length} order(s)</td>
             <td style="text-align:right">${money(orders.reduce((s, o) => s + Number(o.deliveryFee || 0), 0))}</td>
             <td style="text-align:right">${money(orders.reduce((s, o) => s + Number(o.total || 0), 0))}</td>
             <td colspan="2"></td>
@@ -6320,7 +6321,7 @@
         requireApiPermission('reports:export');
         const orders = getAdminFilteredOrders();
         const esc = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
-        const header = ['Order Date','Order No.','Invoice No.','Customer Name','Mobile Number','Fulfillment','Delivery Address','City','Area / Postcode','Delivery Date','Items','Qty (total units)','Delivery Fee','Total Amount','Payment Method','Payment Status','Order Status'];
+        const header = ['Order Date','Order No.','Invoice No.','Customer Name','Mobile Number','Email','Fulfillment','Delivery Address','City','Area / Postcode','Delivery Date','Items','Qty (total units)','Delivery Fee','Total Amount','Payment Method','Payment Status','Order Status'];
         const dataRows = orders.map((o) => {
           const orderDate = o.createdAt ? new Date(o.createdAt).toLocaleDateString('en-GB') : '';
           const delivDate = o.deliveryDate ? new Date(o.deliveryDate).toLocaleDateString('en-GB') : '';
@@ -6329,7 +6330,7 @@
           const isDelivery = (o.fulfillmentMethod || '').toLowerCase() === 'delivery';
           return [
             orderDate, o.orderNumber || o.id, o.invoiceNumber || '',
-            o.customer || '', o.phone || '',
+            o.customer || '', o.phone || '', o.email || '',
             isDelivery ? 'Delivery' : 'Pickup',
             isDelivery ? (o.deliveryAddress || '') : '', isDelivery ? (o.deliveryCity || '') : '', isDelivery ? (o.deliveryArea || '') : '',
             delivDate, itemNames, totalUnits,
@@ -6388,6 +6389,7 @@
           <div class="detail-grid" style="margin-bottom:20px">
             ${_df('Name', order.customer)}
             ${_df('Phone', `<a href="tel:${order.phone}" style="color:inherit">${order.phone || '–'}</a>`)}
+            ${order.email ? _df('Email', `<a href="mailto:${order.email}" style="color:inherit">${order.email}</a>`) : ''}
           </div>
           ${isDelivery ? `
           <h3 style="margin:0 0 12px;font-size:.95rem;font-weight:900;text-transform:uppercase;letter-spacing:.04em;color:rgba(32,32,32,.55)">Shipment Details</h3>
@@ -7811,7 +7813,7 @@
         ));
       }
       function clearCheckoutSessionFields() {
-        ['checkout-name', 'checkout-phone', 'checkout-address', 'checkout-city', 'checkout-area', 'checkout-reference', 'checkout-notes'].forEach((id) => {
+        ['checkout-name', 'checkout-phone', 'checkout-email', 'checkout-address', 'checkout-city', 'checkout-area', 'checkout-reference', 'checkout-notes'].forEach((id) => {
           const field = document.getElementById(id);
           if (field) field.value = '';
         });
@@ -9468,35 +9470,57 @@
         setFeeEditingMode(true);
         document.getElementById('admin-delivery-fees')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
-      async function saveIcePackSettings(event) {
+      function renderPackagingTiers() {
+        const tbody = document.getElementById('packaging-tiers-body');
+        if (!tbody) return;
+        tbody.innerHTML = packagingRules.map((r, i) => `
+          <tr>
+            <td style="padding:8px 10px;border:1px solid var(--line);color:var(--muted);font-weight:600;white-space:nowrap">Tier ${i + 1}</td>
+            <td style="padding:6px 8px;border:1px solid var(--line)"><input type="number" min="1" step="1" value="${r.minPcs ?? ''}" data-tier="${i}" data-field="minPcs" style="width:70px;padding:6px;border:1px solid var(--line);border-radius:6px;font-size:.9rem" /></td>
+            <td style="padding:6px 8px;border:1px solid var(--line)"><input type="number" min="1" step="1" value="${r.maxPcs ?? ''}" placeholder="no limit" data-tier="${i}" data-field="maxPcs" style="width:90px;padding:6px;border:1px solid var(--line);border-radius:6px;font-size:.9rem" /></td>
+            <td style="padding:6px 8px;border:1px solid var(--line)"><input type="number" min="0" step="0.001" value="${r.weightKg ?? ''}" data-tier="${i}" data-field="weightKg" style="width:90px;padding:6px;border:1px solid var(--line);border-radius:6px;font-size:.9rem" /></td>
+            <td style="padding:6px 8px;border:1px solid var(--line);text-align:center"><button type="button" class="secondary" onclick="removePackagingTierRow(${i})" style="padding:4px 10px;font-size:.8rem">✕</button></td>
+          </tr>
+        `).join('');
+      }
+      function addPackagingTierRow() {
+        packagingRules = [...packagingRules, { minPcs: '', maxPcs: null, weightKg: '' }];
+        renderPackagingTiers();
+      }
+      function removePackagingTierRow(index) {
+        packagingRules = packagingRules.filter((_, i) => i !== index);
+        renderPackagingTiers();
+      }
+      async function savePackagingSettings(event) {
         event.preventDefault();
-        const enabled       = document.getElementById('ice-pack-enabled').value;
-        const weightKg      = document.getElementById('ice-pack-weight').value.trim();
-        const packsPerPiece = document.getElementById('ice-pack-packs-per-piece').value.trim();
-        const minQty        = document.getElementById('ice-pack-min-qty').value.trim();
-        const description   = document.getElementById('ice-pack-description').value.trim();
+        const enabled = document.getElementById('packaging-enabled').value;
+        const rows = document.querySelectorAll('#packaging-tiers-body tr');
+        const rules = Array.from(rows).map(row => {
+          const minPcs   = row.querySelector('[data-field="minPcs"]')?.value;
+          const maxPcs   = row.querySelector('[data-field="maxPcs"]')?.value;
+          const weightKg = row.querySelector('[data-field="weightKg"]')?.value;
+          return { minPcs: parseInt(minPcs, 10) || 1, maxPcs: maxPcs ? parseInt(maxPcs, 10) : null, weightKg: parseFloat(weightKg) || 0 };
+        }).filter(r => r.weightKg > 0 && r.minPcs >= 1);
         try {
-          const res = await fetch('/api/admin/master/settings/ice-pack', {
+          const res = await fetch('/api/admin/master/settings/packaging', {
             method: 'POST', credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ enabled, weight_kg: weightKg, packs_per_piece: packsPerPiece, min_qty: minQty, description })
+            body: JSON.stringify({ enabled, rules })
           });
           const data = await res.json();
-          if (!res.ok) { showToast(data.error || 'Failed to save ice pack settings.', 'error'); return; }
-          icePackSettings.enabled       = enabled !== 'false';
-          if (weightKg)      icePackSettings.weightKg      = parseFloat(weightKg) || 0.5;
-          if (packsPerPiece) icePackSettings.packsPerPiece = Math.max(1, parseInt(packsPerPiece, 10) || 2);
-          if (minQty)        icePackSettings.minQty        = Math.max(0, parseInt(minQty, 10) || 1);
-          if (description)   icePackSettings.description   = description;
-          showToast('Ice pack settings saved.');
+          if (!res.ok) { showToast(data.error || 'Failed to save packaging settings.', 'error'); return; }
+          packagingEnabled = enabled !== 'false';
+          packagingRules = rules;
+          renderPackagingTiers();
           renderCart();
-          const preview = document.getElementById('ice-pack-rule-preview');
+          const preview = document.getElementById('packaging-rule-preview');
           if (preview) {
             preview.style.display = '';
-            const perPack = icePackSettings.packsPerPiece;
-            preview.innerHTML = `<strong>Active rule:</strong> ${icePackSettings.enabled ? '✅ Enabled' : '❌ Disabled'} &nbsp;·&nbsp; ${icePackSettings.weightKg}&nbsp;kg per ice pack &nbsp;·&nbsp; 1 ice pack covers ${perPack} frozen pack${perPack !== 1 ? 's' : ''} &nbsp;·&nbsp; Minimum ${icePackSettings.minQty} ice pack${icePackSettings.minQty !== 1 ? 's' : ''}`;
+            const tierSummary = packagingRules.map((r, i) => `Tier ${i+1}: ${r.minPcs}–${r.maxPcs ?? '∞'} pcs → ${r.weightKg} kg`).join(' &nbsp;&middot;&nbsp; ');
+            preview.innerHTML = `<strong>Saved:</strong> ${packagingEnabled ? '✅ Enabled' : '❌ Disabled'} &nbsp;&middot;&nbsp; ${tierSummary || 'No tiers configured'}`;
           }
-        } catch (e) { showToast('Network error saving ice pack settings.', 'error'); }
+          showToast('Packaging settings saved.');
+        } catch (e) { showToast('Network error saving packaging settings.', 'error'); }
       }
       async function saveLargeOrderMessage(event) {
         event.preventDefault();

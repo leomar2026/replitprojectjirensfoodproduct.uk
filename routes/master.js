@@ -792,43 +792,42 @@ router.delete('/whats-new/:id', requireRole('manager', 'admin'), async (req, res
     } catch (err) { res.status(500).json({ error: 'Failed to remove.' }); }
 });
 
-// GET /api/admin/master/settings/ice-pack
-router.get('/settings/ice-pack', requireRole('cashier', 'manager', 'admin'), async (req, res) => {
+// GET /api/admin/master/settings/packaging
+router.get('/settings/packaging', requireRole('cashier', 'manager', 'admin'), async (req, res) => {
     try {
-        const result = await pool.query("SELECT key, value FROM app_settings WHERE key LIKE 'ice_pack_%'");
+        const result = await pool.query("SELECT key, value FROM app_settings WHERE key IN ('packaging_enabled','packaging_rules')");
         const s = {};
         result.rows.forEach(r => { s[r.key] = r.value; });
-        res.json({
-            enabled:       s.ice_pack_enabled !== 'false',
-            weight_kg:     parseFloat(s.ice_pack_weight_kg      || '0.5') || 0.5,
-            packs_per_piece: parseInt(s.ice_pack_packs_per_piece || '2', 10) || 2,
-            min_qty:       parseInt(s.ice_pack_min_qty           || '1', 10) || 1,
-            description:   s.ice_pack_description || 'Cold protection packaging for frozen items'
-        });
+        let rules = [];
+        try { rules = JSON.parse(s.packaging_rules || '[]'); } catch (_) {}
+        if (!Array.isArray(rules) || !rules.length) {
+            rules = [
+                { minPcs: 1, maxPcs: 2,   weightKg: 0.700 },
+                { minPcs: 3, maxPcs: null, weightKg: 1.000 }
+            ];
+        }
+        res.json({ enabled: s.packaging_enabled !== 'false', rules });
     } catch (err) {
-        res.status(500).json({ error: 'Failed to load ice pack settings.' });
+        res.status(500).json({ error: 'Failed to load packaging settings.' });
     }
 });
 
-// POST /api/admin/master/settings/ice-pack
-router.post('/settings/ice-pack', requireRole('manager', 'admin'), async (req, res) => {
-    const { enabled, weight_kg, packs_per_piece, min_qty, description } = req.body;
+// POST /api/admin/master/settings/packaging
+router.post('/settings/packaging', requireRole('manager', 'admin'), async (req, res) => {
+    const { enabled, rules } = req.body;
     try {
-        const updates = [];
-        const upsert = (key, val) => updates.push(pool.query(
+        const upsert = (key, val) => pool.query(
             'INSERT INTO app_settings (key,value,updated_at) VALUES ($1,$2,NOW()) ON CONFLICT (key) DO UPDATE SET value=$2, updated_at=NOW()',
             [key, String(val)]
-        ));
-        if (enabled       !== undefined) upsert('ice_pack_enabled',        enabled);
-        if (weight_kg     !== undefined) upsert('ice_pack_weight_kg',      weight_kg);
-        if (packs_per_piece !== undefined) upsert('ice_pack_packs_per_piece', packs_per_piece);
-        if (min_qty       !== undefined) upsert('ice_pack_min_qty',        min_qty);
-        if (description   !== undefined) upsert('ice_pack_description',    description);
+        );
+        const updates = [];
+        if (enabled !== undefined) updates.push(upsert('packaging_enabled', enabled));
+        if (rules   !== undefined) updates.push(upsert('packaging_rules', JSON.stringify(rules)));
         if (!updates.length) return res.status(400).json({ error: 'No valid settings provided.' });
         await Promise.all(updates);
-        res.json({ message: 'Ice pack settings saved.' });
+        res.json({ message: 'Packaging settings saved.' });
     } catch (err) {
-        res.status(500).json({ error: 'Failed to save ice pack settings.' });
+        res.status(500).json({ error: 'Failed to save packaging settings.' });
     }
 });
 

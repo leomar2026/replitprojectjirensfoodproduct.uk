@@ -46,34 +46,40 @@ async function calcDeliveryFeeFromDb(totalWeightKg, fulfillmentMethod, client) {
     return 11.95;
 }
 
-async function getIcePackSettings(client) {
+async function getPackagingRules(client) {
     try {
         const result = await client.query(
-            "SELECT key, value FROM app_settings WHERE key LIKE 'ice_pack_%'"
+            "SELECT key, value FROM app_settings WHERE key IN ('packaging_enabled','packaging_rules')"
         );
         const s = {};
         result.rows.forEach(r => { s[r.key] = r.value; });
-        return {
-            enabled:       s.ice_pack_enabled !== 'false',
-            weightKg:      parseFloat(s.ice_pack_weight_kg     || '0.5') || 0.5,
-            packsPerPiece: Math.max(1, parseInt(s.ice_pack_packs_per_piece || '2', 10) || 2),
-            minQty:        Math.max(0, parseInt(s.ice_pack_min_qty          || '1', 10) || 1),
-        };
+        const enabled = s.packaging_enabled !== 'false';
+        let rules = [];
+        try { rules = JSON.parse(s.packaging_rules || '[]'); } catch (_) {}
+        if (!Array.isArray(rules) || !rules.length) {
+            rules = [
+                { minPcs: 1, maxPcs: 2,   weightKg: 0.700 },
+                { minPcs: 3, maxPcs: null, weightKg: 1.000 }
+            ];
+        }
+        return { enabled, rules };
     } catch (_) {
-        return { enabled: true, weightKg: 0.5, packsPerPiece: 2, minQty: 1 };
+        return { enabled: true, rules: [
+            { minPcs: 1, maxPcs: 2,   weightKg: 0.700 },
+            { minPcs: 3, maxPcs: null, weightKg: 1.000 }
+        ]};
     }
 }
 
-function calcIcePack(totalFrozenPacks, settings, fulfillmentMethod) {
-    if (fulfillmentMethod !== 'delivery' || !settings.enabled || totalFrozenPacks <= 0) {
-        return { requiredQty: 0, totalWeight: 0 };
+function calcPackaging(totalFrozenPacks, packagingSettings, fulfillmentMethod) {
+    if (fulfillmentMethod !== 'delivery' || !packagingSettings.enabled || totalFrozenPacks <= 0) {
+        return { weightKg: 0 };
     }
-    const rawQty     = Math.ceil(totalFrozenPacks / Math.max(1, settings.packsPerPiece));
-    const requiredQty = Math.max(rawQty, settings.minQty);
-    return {
-        requiredQty,
-        totalWeight: parseFloat((requiredQty * settings.weightKg).toFixed(3))
-    };
+    const rule = packagingSettings.rules.find(r =>
+        totalFrozenPacks >= Number(r.minPcs) &&
+        (r.maxPcs === '' || r.maxPcs == null || totalFrozenPacks <= Number(r.maxPcs))
+    );
+    return rule ? { weightKg: parseFloat(Number(rule.weightKg).toFixed(3)) } : { weightKg: 0 };
 }
 
 function generateOrderNumber(nextId) {
@@ -100,7 +106,7 @@ async function getDailyLimitSettings(client) {
 // POST /api/orders — customer checkout
 router.post('/', upload.single('payment_proof'), async (req, res) => {
     const {
-        customer_name, customer_phone, fulfillment_method,
+        customer_name, customer_phone, customer_email, fulfillment_method,
         delivery_address, delivery_city, delivery_area,
         payment_method, payment_reference, notes,
         items, idempotency_key, delivery_date
@@ -206,11 +212,11 @@ router.post('/', upload.single('payment_proof'), async (req, res) => {
             lineItems.push({ product, qty, unitPrice, weightKg, lineWeight, lineTotal });
         }
 
-        // ── Ice pack calculation ─────────────────────────────────────────────
-        const iceSettings  = await getIcePackSettings(client);
-        const icePack      = calcIcePack(totalFrozenPacks, iceSettings, fulfillment_method || 'pickup');
+        // ── Packaging weight calculation ──────────────────────────────────────
+        const packagingSettings = await getPackagingRules(client);
+        const packaging = calcPackaging(totalFrozenPacks, packagingSettings, fulfillment_method || 'pickup');
         const productWeight = parseFloat(productWeightTotal.value.toFixed(3));
-        const totalDeliveryWeight = parseFloat((productWeight + icePack.totalWeight).toFixed(3));
+        const totalDeliveryWeight = parseFloat((productWeight + packaging.weightKg).toFixed(3));
 
         // ── Delivery fee (DB-driven, uses total delivery weight) ─────────────
         const deliveryFee = await calcDeliveryFeeFromDb(totalDeliveryWeight, fulfillment_method || 'pickup', client);
@@ -228,7 +234,7 @@ router.post('/', upload.single('payment_proof'), async (req, res) => {
         await client.query(`
             INSERT INTO orders (
                 id, order_number, idempotency_key,
-                customer_name, customer_phone,
+                customer_name, customer_phone, customer_email,
                 fulfillment_method, delivery_date,
                 delivery_address, delivery_city, delivery_area,
                 payment_method, payment_method_display, payment_reference,
@@ -238,14 +244,14 @@ router.post('/', upload.single('payment_proof'), async (req, res) => {
                 ice_pack_weight_per_piece, ice_pack_total_weight,
                 product_weight_total, total_delivery_weight
             ) VALUES (
-                $1,$2,$3,$4,$5,$6,$7,
-                $8,$9,$10,$11,$12,$13,
-                $14,$15,$16,$17,$18,$19,$20,
-                $21,$22,$23,$24,$25,$26,$27
+                $1,$2,$3,$4,$5,$6,
+                $7,$8,$9,$10,$11,$12,$13,
+                $14,$15,$16,$17,$18,$19,$20,$21,
+                $22,$23,$24,$25,$26,$27,$28
             )
         `, [
             nextId, orderNumber, idempotency_key || null,
-            customer_name.trim(), customer_phone.trim(),
+            customer_name.trim(), customer_phone.trim(), customer_email?.trim() || null,
             fulfillment_method || 'pickup',
             delivery_date || null,
             delivery_address || null, delivery_city || null, delivery_area || null,
@@ -254,8 +260,8 @@ router.post('/', upload.single('payment_proof'), async (req, res) => {
             subtotal, vatRate, vatAmount,
             totalDeliveryWeight, deliveryFee, totalAmount,
             notes || null,
-            totalFrozenPacks, iceSettings.packsPerPiece, icePack.requiredQty,
-            iceSettings.weightKg, icePack.totalWeight,
+            totalFrozenPacks, null, packaging.weightKg > 0 ? 1 : 0,
+            packaging.weightKg, packaging.weightKg,
             productWeight, totalDeliveryWeight
         ]);
 

@@ -254,5 +254,6 @@ app.listen(PORT, HOST, async () => {
     console.log(dbOk ? 'Database connected.' : 'WARNING: Database connection failed.');
     if (dbOk) {
         pool.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_date DATE').catch(() => {});
+        pool.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_email VARCHAR(255)').catch(() => {});
     }
 });

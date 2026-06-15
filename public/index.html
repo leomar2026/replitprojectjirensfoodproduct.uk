@@ -3860,7 +3860,7 @@
             <div class="sku">${p.sku}</div>
             <h3 class="product-click" onclick="${productDisplayImage(p) ? `openPreview('${productDisplayImage(p)}','${p.name}')` : ''}">${p.name}</h3>
             <p class="desc">${p.description}</p>
-            <div class="buy"><div><small>${p.pack}${(p.displayWeight || p.weightKg) ? ' · ' + (p.displayWeight || formatWeight(p.weightKg)) : ''}</small><div class="price">${money(p.price)}</div></div><button class="primary" onclick="addToCart(${p.id})">Add</button></div>
+            <div class="buy"><div><small>${p.displayWeight || (p.weightKg ? formatWeight(p.weightKg) : p.pack)}</small><div class="price">${money(p.price)}</div></div><button class="primary" onclick="addToCart(${p.id})">Add</button></div>
           </div>
         </article>
       `).join('') : '<div class="panel" style="grid-column:1/-1"><h2>No active products</h2><p class="desc">Products are hidden because they are disabled in the backend.</p><button class="primary" onclick="restoreProductDisplay()">Show products again</button></div>';

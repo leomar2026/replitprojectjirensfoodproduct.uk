@@ -5129,7 +5129,7 @@
             <td>${promo.startDate || 'Any'} to ${promo.endDate || 'Any'}</td>
             <td>${promo.usageCount}${promo.maxTotalUsage ? ` / ${promo.maxTotalUsage}` : ''}</td>
             <td><span class="status-badge ${promo.active ? 'status-active' : 'status-inactive'}">${promo.active ? 'Active' : 'Inactive'}</span></td>
-            <td><button class="secondary" onclick="editPromotion(${promo.id})">Edit</button> <button class="${promo.active ? 'secondary' : 'primary'}" onclick="togglePromotion(${promo.id})">${promo.active ? 'Disable' : 'Enable'}</button> <button class="secondary" style="color:#c62828" onclick="deletePromotionEntry(${promo.id},'${promo.name.replace(/'/g,\\\"\\\")}')">Delete</button></td>
+            <td><button class="secondary" onclick="editPromotion(${promo.id})">Edit</button> <button class="${promo.active ? 'secondary' : 'primary'}" onclick="togglePromotion(${promo.id})">${promo.active ? 'Disable' : 'Enable'}</button> <button class="secondary" style="color:#c62828" onclick="deletePromotionEntry(${promo.id})">Delete</button></td>
           </tr>
         `).join('');
       }
@@ -5219,8 +5219,9 @@
           renderCart();
         } catch (e) { alert('Network error toggling promotion.'); }
       }
-      async function deletePromotionEntry(id, name) {
-        if (!confirm(`Delete promotion "${name}"? This cannot be undone.`)) return;
+      async function deletePromotionEntry(id) {
+        const promo = promotions.find((item) => item.id === id);
+        if (!confirm(`Delete promotion "${promo?.name || id}"? This cannot be undone.`)) return;
         try {
           const res = await fetch(`/api/admin/promotions/${id}`, { method: 'DELETE', credentials: 'same-origin' });
           const data = await res.json();
@@ -5869,7 +5870,7 @@
               <td>${vendor.email || '-'}</td>
               <td>${vendor.address || '-'}</td>
               <td><span class="status-badge ${vendor.active !== false ? 'status-active' : 'status-inactive'}">${vendor.active !== false ? 'Active' : 'Inactive'}</span></td>
-              <td><button class="secondary" onclick="editMasterVendor(${vendor.id})">Edit</button> <button class="${vendor.active !== false ? 'secondary' : 'primary'}" onclick="toggleMasterVendor(${vendor.id})">${vendor.active !== false ? 'Deactivate' : 'Activate'}</button> <button class="secondary" style="color:#c62828" onclick="deleteMasterVendorEntry(${vendor.id},'${vendor.name.replace(/'/g,&quot;&quot;)}')">Delete</button></td>
+              <td><button class="secondary" onclick="editMasterVendor(${vendor.id})">Edit</button> <button class="${vendor.active !== false ? 'secondary' : 'primary'}" onclick="toggleMasterVendor(${vendor.id})">${vendor.active !== false ? 'Deactivate' : 'Activate'}</button> <button class="secondary" style="color:#c62828" onclick="deleteMasterVendorEntry(${vendor.id})">Delete</button></td>
             </tr>
           `).join('') : '<tr><td colspan="7">No vendors found.</td></tr>';
         }
@@ -6176,8 +6177,9 @@
           renderManagerDirectoryViews();
         } catch (e) { alert('Network error toggling vendor.'); }
       }
-      async function deleteMasterVendorEntry(id, name) {
-        if (!confirm(`Delete vendor "${name}"? This cannot be undone.`)) return;
+      async function deleteMasterVendorEntry(id) {
+        const vendor = masterVendors.find((item) => item.id === id);
+        if (!confirm(`Delete vendor "${vendor?.name || id}"? This cannot be undone.`)) return;
         try {
           const res = await fetch(`/api/admin/vendors/${id}`, { method: 'DELETE', credentials: 'same-origin' });
           const data = await res.json();

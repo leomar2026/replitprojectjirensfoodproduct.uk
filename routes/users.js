@@ -111,4 +111,32 @@ router.patch('/:id/toggle', requireRole('admin'), async (req, res) => {
     }
 });
 
+// DELETE /api/admin/users/:id
+router.delete('/:id', requireRole('admin'), async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const result = await client.query(
+            `DELETE FROM users WHERE id=$1 AND role IN ('manager','cashier') RETURNING id, username, role`,
+            [req.params.id]
+        );
+        if (!result.rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'User not found.' }); }
+        const meta = { userId: req.session.userId || null, userRole: req.session.role || null, ipAddress: req.ip || null };
+        await client.query(
+            `INSERT INTO audit_logs (action, entity_type, entity_id, user_name, details, user_id, user_role, ip_address)
+             VALUES ('user_deleted', 'user', $1, $2, $3, $4, $5, $6)`,
+            [String(result.rows[0].id), req.session.username,
+             JSON.stringify({ deleted_username: result.rows[0].username, role: result.rows[0].role }),
+             meta.userId, meta.userRole, meta.ipAddress]
+        );
+        await client.query('COMMIT');
+        res.json({ message: 'User deleted.' });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: 'Failed to delete user.' });
+    } finally {
+        client.release();
+    }
+});
+
 module.exports = router;

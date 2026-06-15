@@ -104,4 +104,23 @@ router.patch('/:id/toggle', requireRole('manager', 'admin'), async (req, res) =>
     }
 });
 
+// DELETE /api/admin/vendors/:id
+router.delete('/:id', requireRole('admin'), async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const result = await client.query('DELETE FROM vendors WHERE id=$1 RETURNING *', [req.params.id]);
+        if (!result.rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Vendor not found.' }); }
+        await addAuditLog(client, 'vendor_deleted', 'vendor', req.params.id,
+            req.session.fullName || req.session.username, {});
+        await client.query('COMMIT');
+        res.json({ message: 'Vendor deleted.' });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: 'Failed to delete vendor.' });
+    } finally {
+        client.release();
+    }
+});
+
 module.exports = router;

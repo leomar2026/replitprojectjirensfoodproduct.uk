@@ -5129,7 +5129,7 @@
             <td>${promo.startDate || 'Any'} to ${promo.endDate || 'Any'}</td>
             <td>${promo.usageCount}${promo.maxTotalUsage ? ` / ${promo.maxTotalUsage}` : ''}</td>
             <td><span class="status-badge ${promo.active ? 'status-active' : 'status-inactive'}">${promo.active ? 'Active' : 'Inactive'}</span></td>
-            <td><button class="secondary" onclick="editPromotion(${promo.id})">Edit</button> <button class="${promo.active ? 'secondary' : 'primary'}" onclick="togglePromotion(${promo.id})">${promo.active ? 'Disable' : 'Enable'}</button></td>
+            <td><button class="secondary" onclick="editPromotion(${promo.id})">Edit</button> <button class="${promo.active ? 'secondary' : 'primary'}" onclick="togglePromotion(${promo.id})">${promo.active ? 'Disable' : 'Enable'}</button> <button class="secondary" style="color:#c62828" onclick="deletePromotionEntry(${promo.id},'${promo.name.replace(/'/g,\\\"\\\")}')">Delete</button></td>
           </tr>
         `).join('');
       }
@@ -5218,6 +5218,18 @@
           renderPromotions();
           renderCart();
         } catch (e) { alert('Network error toggling promotion.'); }
+      }
+      async function deletePromotionEntry(id, name) {
+        if (!confirm(`Delete promotion "${name}"? This cannot be undone.`)) return;
+        try {
+          const res = await fetch(`/api/admin/promotions/${id}`, { method: 'DELETE', credentials: 'same-origin' });
+          const data = await res.json();
+          if (!res.ok) { showToast(data.error || 'Failed to delete promotion.', 'error'); return; }
+          promotions = promotions.filter((item) => item.id !== id);
+          renderPromotions();
+          renderCart();
+          showToast('Promotion deleted.');
+        } catch (e) { showToast('Network error deleting promotion.', 'error'); }
       }
       function showAdminPage(id) {
         if (!hasPermission(currentUserRole, 'pages', id)) {
@@ -5633,7 +5645,7 @@
             <td>${series.nextNumber}</td>
             <td>${series.padding}</td>
             <td><span class="status-badge ${series.active ? 'status-active' : 'status-inactive'}">${series.active ? 'Active' : 'Inactive'}</span></td>
-            <td><button class="secondary" onclick="editNumberSeries(${series.id})">Edit</button> <button class="${series.active ? 'secondary' : 'primary'}" onclick="toggleNumberSeries(${series.id})">${series.active ? 'Disable' : 'Enable'}</button></td>
+            <td><button class="secondary" onclick="editNumberSeries(${series.id})">Edit</button> <button class="${series.active ? 'secondary' : 'primary'}" onclick="toggleNumberSeries(${series.id})">${series.active ? 'Disable' : 'Enable'}</button> <button class="secondary" style="color:#c62828" onclick="deleteNumberSeriesEntry(${series.id},'${series.documentType}')">Delete</button></td>
           </tr>
         `).join('');
       }
@@ -5664,7 +5676,7 @@
               <td>${maxLabel}</td>
               <td>${feeLabel}</td>
               <td><span class="status-badge ${rule.active ? 'status-active' : 'status-inactive'}">${rule.active ? 'Active' : 'Inactive'}</span></td>
-              <td><button class="secondary" onclick="editDeliveryFeeRule(${rule.id})">Edit</button> <button class="${rule.active ? 'secondary' : 'primary'}" onclick="toggleDeliveryFeeRule(${rule.id})">${rule.active ? 'Disable' : 'Enable'}</button></td>
+              <td><button class="secondary" onclick="editDeliveryFeeRule(${rule.id})">Edit</button> <button class="${rule.active ? 'secondary' : 'primary'}" onclick="toggleDeliveryFeeRule(${rule.id})">${rule.active ? 'Disable' : 'Enable'}</button> <button class="secondary" style="color:#c62828" onclick="deleteDeliveryFeeRuleEntry(${rule.id})">Delete</button></td>
             </tr>
           `}).join('');
         const msgInput = document.getElementById('large-order-message-input');
@@ -5677,7 +5689,7 @@
           <tr>
             <td>${category.name}</td>
             <td><span class="status-badge ${category.active ? 'status-active' : 'status-inactive'}">${category.active ? 'Active' : 'Inactive'}</span></td>
-            <td><button class="secondary" onclick="editCategoryMaster(${category.id})">Edit</button> <button class="${category.active ? 'secondary' : 'primary'}" onclick="toggleCategoryMaster(${category.id})">${category.active ? 'Disable' : 'Enable'}</button></td>
+            <td><button class="secondary" onclick="editCategoryMaster(${category.id})">Edit</button> <button class="${category.active ? 'secondary' : 'primary'}" onclick="toggleCategoryMaster(${category.id})">${category.active ? 'Disable' : 'Enable'}</button> <button class="secondary" style="color:#c62828" onclick="deleteCategoryMasterEntry(${category.id},'${category.name}')">Delete</button></td>
           </tr>
         `).join('');
         renderProductMasterOptions();
@@ -5690,7 +5702,7 @@
             <td>${uom.code}</td>
             <td>${uom.name}</td>
             <td><span class="status-badge ${uom.active ? 'status-active' : 'status-inactive'}">${uom.active ? 'Active' : 'Inactive'}</span></td>
-            <td><button class="secondary" onclick="editUomMaster(${uom.id})">Edit</button> <button class="${uom.active ? 'secondary' : 'primary'}" onclick="toggleUomMaster(${uom.id})">${uom.active ? 'Disable' : 'Enable'}</button></td>
+            <td><button class="secondary" onclick="editUomMaster(${uom.id})">Edit</button> <button class="${uom.active ? 'secondary' : 'primary'}" onclick="toggleUomMaster(${uom.id})">${uom.active ? 'Disable' : 'Enable'}</button> <button class="secondary" style="color:#c62828" onclick="deleteUomMasterEntry(${uom.id},'${uom.code}')">Delete</button></td>
           </tr>
         `).join('');
         renderProductMasterOptions();
@@ -5719,7 +5731,7 @@
             <td><span class="status-badge ${currency.active ? 'status-active' : 'status-inactive'}">${currency.active ? 'Active' : 'Inactive'}</span></td>
             <td>${currency.decimalPlaces}</td>
             <td>${currency.displayFormat}</td>
-            <td><button class="secondary" onclick="editCurrencyMaster('${currency.code}')">Edit</button> <button class="secondary" onclick="setDefaultCurrency('${currency.code}')">Set Default</button> <button class="${currency.active ? 'secondary' : 'primary'}" onclick="toggleCurrencyMaster('${currency.code}')">${currency.active ? 'Deactivate' : 'Activate'}</button></td>
+            <td><button class="secondary" onclick="editCurrencyMaster('${currency.code}')">Edit</button> <button class="secondary" onclick="setDefaultCurrency('${currency.code}')">Set Default</button> <button class="${currency.active ? 'secondary' : 'primary'}" onclick="toggleCurrencyMaster('${currency.code}')">${currency.active ? 'Deactivate' : 'Activate'}</button>${currency.default ? '' : ` <button class="secondary" style="color:#c62828" onclick="deleteCurrencyMasterEntry('${currency.code}')">Delete</button>`}</td>
           </tr>
         `).join('');
         const masterCurrency = document.getElementById('master-currency');
@@ -5807,6 +5819,17 @@
           renderCurrencyMaster();
         } catch (e) { alert('Network error toggling currency.'); }
       }
+      async function deleteCurrencyMasterEntry(code) {
+        if (!confirm(`Delete currency "${code}"? This cannot be undone.`)) return;
+        try {
+          const res = await fetch(`/api/admin/master/settings/currency/${code}`, { method: 'DELETE', credentials: 'same-origin' });
+          const data = await res.json();
+          if (!res.ok) { showToast(data.error || 'Failed to delete currency.', 'error'); return; }
+          currencyMaster = currencyMaster.filter((item) => item.code !== code.toUpperCase());
+          renderCurrencyMaster();
+          showToast('Currency deleted.');
+        } catch (e) { showToast('Network error deleting currency.', 'error'); }
+      }
       function renderMasterRecords() {
         const customerRows = document.getElementById('master-customer-rows');
         const vendorRows = document.getElementById('master-vendor-rows');
@@ -5846,7 +5869,7 @@
               <td>${vendor.email || '-'}</td>
               <td>${vendor.address || '-'}</td>
               <td><span class="status-badge ${vendor.active !== false ? 'status-active' : 'status-inactive'}">${vendor.active !== false ? 'Active' : 'Inactive'}</span></td>
-              <td><button class="secondary" onclick="editMasterVendor(${vendor.id})">Edit</button> <button class="${vendor.active !== false ? 'secondary' : 'primary'}" onclick="toggleMasterVendor(${vendor.id})">${vendor.active !== false ? 'Deactivate' : 'Activate'}</button></td>
+              <td><button class="secondary" onclick="editMasterVendor(${vendor.id})">Edit</button> <button class="${vendor.active !== false ? 'secondary' : 'primary'}" onclick="toggleMasterVendor(${vendor.id})">${vendor.active !== false ? 'Deactivate' : 'Activate'}</button> <button class="secondary" style="color:#c62828" onclick="deleteMasterVendorEntry(${vendor.id},'${vendor.name.replace(/'/g,&quot;&quot;)}')">Delete</button></td>
             </tr>
           `).join('') : '<tr><td colspan="7">No vendors found.</td></tr>';
         }
@@ -5856,7 +5879,7 @@
               <td>${user.username}</td>
               <td>${user.role}</td>
               <td><span class="status-badge ${user.active ? 'status-active' : 'status-inactive'}">${user.active ? 'Active' : 'Inactive'}</span></td>
-              <td><button class="${user.active ? 'secondary' : 'primary'}" onclick="toggleMasterUser(${user.id})">${user.active ? 'Disable' : 'Enable'}</button></td>
+              <td><button class="${user.active ? 'secondary' : 'primary'}" onclick="toggleMasterUser(${user.id})">${user.active ? 'Disable' : 'Enable'}</button> <button class="secondary" style="color:#c62828" onclick="deleteMasterUserEntry(${user.id},'${user.username}')">Delete</button></td>
             </tr>
           `).join('') : '<tr><td colspan="4">No additional users yet.</td></tr>';
         }
@@ -5952,6 +5975,17 @@
           renderCategoryMaster();
         } catch (e) { alert('Network error toggling category.'); }
       }
+      async function deleteCategoryMasterEntry(id, name) {
+        if (!confirm(`Delete category "${name}"? This cannot be undone.`)) return;
+        try {
+          const res = await fetch(`/api/admin/master/categories/${id}`, { method: 'DELETE', credentials: 'same-origin' });
+          const data = await res.json();
+          if (!res.ok) { showToast(data.error || 'Failed to delete category.', 'error'); return; }
+          categoryMaster = categoryMaster.filter((item) => item.id !== id);
+          renderCategoryMaster();
+          showToast('Category deleted.');
+        } catch (e) { showToast('Network error deleting category.', 'error'); }
+      }
       async function addUomMaster(event) {
         event.preventDefault();
         const code = document.getElementById('uom-code').value.trim();
@@ -6003,6 +6037,17 @@
           if (uom) uom.active = data.uom.active;
           renderUomMaster();
         } catch (e) { alert('Network error toggling UOM.'); }
+      }
+      async function deleteUomMasterEntry(id, code) {
+        if (!confirm(`Delete UOM "${code}"? This cannot be undone.`)) return;
+        try {
+          const res = await fetch(`/api/admin/master/uom/${id}`, { method: 'DELETE', credentials: 'same-origin' });
+          const data = await res.json();
+          if (!res.ok) { showToast(data.error || 'Failed to delete UOM.', 'error'); return; }
+          uomMaster = uomMaster.filter((item) => item.id !== id);
+          renderUomMaster();
+          showToast('UOM deleted.');
+        } catch (e) { showToast('Network error deleting UOM.', 'error'); }
       }
       async function applyTaxVatSetup(event) {
         event.preventDefault();
@@ -6131,6 +6176,18 @@
           renderManagerDirectoryViews();
         } catch (e) { alert('Network error toggling vendor.'); }
       }
+      async function deleteMasterVendorEntry(id, name) {
+        if (!confirm(`Delete vendor "${name}"? This cannot be undone.`)) return;
+        try {
+          const res = await fetch(`/api/admin/vendors/${id}`, { method: 'DELETE', credentials: 'same-origin' });
+          const data = await res.json();
+          if (!res.ok) { showToast(data.error || 'Failed to delete vendor.', 'error'); return; }
+          masterVendors = masterVendors.filter((item) => item.id !== id);
+          renderMasterRecords();
+          renderManagerDirectoryViews();
+          showToast('Vendor deleted.');
+        } catch (e) { showToast('Network error deleting vendor.', 'error'); }
+      }
       async function addMasterUser(event) {
         event.preventDefault();
         const username = document.getElementById('master-user-name').value.trim();
@@ -6160,6 +6217,17 @@
           if (user) user.active = data.user.is_active;
           renderMasterRecords();
         } catch (e) { alert('Network error. Could not toggle user.'); }
+      }
+      async function deleteMasterUserEntry(id, username) {
+        if (!confirm(`Delete user "${username}"? This cannot be undone.`)) return;
+        try {
+          const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE', credentials: 'same-origin' });
+          const data = await res.json();
+          if (!res.ok) { showToast(data.error || 'Failed to delete user.', 'error'); return; }
+          masterUsers = masterUsers.filter((item) => item.id !== id);
+          renderMasterRecords();
+          showToast('User deleted.');
+        } catch (e) { showToast('Network error deleting user.', 'error'); }
       }
       async function renderCashierOrders() {
         if (['admin', 'manager', 'cashier'].includes(currentUserRole)) {
@@ -9379,6 +9447,17 @@
           renderNumberSeries();
         } catch (e) { alert('Network error toggling number series.'); }
       }
+      async function deleteNumberSeriesEntry(id, documentType) {
+        if (!confirm(`Delete number series "${documentType}"? This cannot be undone.`)) return;
+        try {
+          const res = await fetch(`/api/admin/master/number-series/${id}`, { method: 'DELETE', credentials: 'same-origin' });
+          const data = await res.json();
+          if (!res.ok) { showToast(data.error || 'Failed to delete number series.', 'error'); return; }
+          numberSeries = numberSeries.filter((item) => item.id !== id);
+          renderNumberSeries();
+          showToast('Number series deleted.');
+        } catch (e) { showToast('Network error deleting number series.', 'error'); }
+      }
       function updateFeeTypeFormFields(type, contactRequired) {
         const isPack = type === 'PACK';
         const minLabel = document.getElementById('fee-min-label');
@@ -9563,6 +9642,18 @@
           renderDeliveryFeeRules();
           renderCart();
         } catch (e) { alert('Network error toggling delivery fee rule.'); }
+      }
+      async function deleteDeliveryFeeRuleEntry(id) {
+        if (!confirm('Delete this delivery fee rule? This cannot be undone.')) return;
+        try {
+          const res = await fetch(`/api/admin/master/settings/delivery-fee/${id}`, { method: 'DELETE', credentials: 'same-origin' });
+          const data = await res.json();
+          if (!res.ok) { showToast(data.error || 'Failed to delete delivery fee rule.', 'error'); return; }
+          deliveryFeeRules = deliveryFeeRules.filter((item) => item.id !== id);
+          renderDeliveryFeeRules();
+          renderCart();
+          showToast('Delivery fee rule deleted.');
+        } catch (e) { showToast('Network error deleting delivery fee rule.', 'error'); }
       }
       window.adminApi = {
         listNumberSeries: () => numberSeries.map((item) => ({ ...item })),

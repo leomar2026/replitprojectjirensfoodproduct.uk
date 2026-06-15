@@ -132,6 +132,25 @@ router.put('/categories/:id', requireRole('manager', 'admin'), async (req, res) 
     }
 });
 
+// DELETE /api/admin/master/categories/:id
+router.delete('/categories/:id', requireRole('admin'), async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const result = await client.query('DELETE FROM categories WHERE id=$1 RETURNING *', [req.params.id]);
+        if (!result.rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Category not found.' }); }
+        await addAuditLog(client, 'category_deleted', 'category', req.params.id,
+            req.session.fullName || req.session.username, {});
+        await client.query('COMMIT');
+        res.json({ message: 'Category deleted.' });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: 'Failed to delete category.' });
+    } finally {
+        client.release();
+    }
+});
+
 // ─────────────────────────────────────────────
 // UOM
 // ─────────────────────────────────────────────
@@ -211,6 +230,25 @@ router.put('/uom/:id', requireRole('manager', 'admin'), async (req, res) => {
     } catch (err) {
         await client.query('ROLLBACK');
         res.status(500).json({ error: 'Failed to update UOM.' });
+    } finally {
+        client.release();
+    }
+});
+
+// DELETE /api/admin/master/uom/:id
+router.delete('/uom/:id', requireRole('admin'), async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const result = await client.query('DELETE FROM uom WHERE id=$1 RETURNING *', [req.params.id]);
+        if (!result.rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'UOM not found.' }); }
+        await addAuditLog(client, 'uom_deleted', 'uom', req.params.id,
+            req.session.fullName || req.session.username, {});
+        await client.query('COMMIT');
+        res.json({ message: 'UOM deleted.' });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: 'Failed to delete UOM.' });
     } finally {
         client.release();
     }
@@ -339,6 +377,27 @@ router.patch('/settings/currency/:code/toggle', requireRole('manager', 'admin'),
     } catch (err) {
         await client.query('ROLLBACK');
         res.status(500).json({ error: 'Failed to toggle currency.' });
+    } finally {
+        client.release();
+    }
+});
+
+// DELETE /api/admin/master/settings/currency/:code
+router.delete('/settings/currency/:code', requireRole('admin'), async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const check = await client.query('SELECT * FROM currency_settings WHERE code=$1', [req.params.code.toUpperCase()]);
+        if (!check.rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Currency not found.' }); }
+        if (check.rows[0].is_default) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Cannot delete the default currency.' }); }
+        await client.query('DELETE FROM currency_settings WHERE code=$1', [req.params.code.toUpperCase()]);
+        await addAuditLog(client, 'currency_deleted', 'currency', req.params.code,
+            req.session.fullName || req.session.username, {});
+        await client.query('COMMIT');
+        res.json({ message: 'Currency deleted.' });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: 'Failed to delete currency.' });
     } finally {
         client.release();
     }
@@ -548,6 +607,17 @@ router.patch('/number-series/:id/toggle', requireRole('manager', 'admin'), async
         res.json({ message: 'Toggled.', series: { id: s.id, documentType: s.document_type, prefix: s.prefix, nextNumber: Number(s.next_number), padding: Number(s.padding), active: s.is_active } });
     } catch (err) {
         res.status(500).json({ error: 'Failed to toggle number series.' });
+    }
+});
+
+// DELETE /api/admin/master/number-series/:id
+router.delete('/number-series/:id', requireRole('admin'), async (req, res) => {
+    try {
+        const result = await pool.query('DELETE FROM number_series WHERE id=$1 RETURNING *', [req.params.id]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Number series not found.' });
+        res.json({ message: 'Number series deleted.' });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to delete number series.' });
     }
 });
 

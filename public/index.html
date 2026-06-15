@@ -4027,7 +4027,9 @@
         appCurrencySymbol = currency.symbol;
       }
       function formatWeight(value) {
-        return `${Number(value || 0).toFixed(2)} kg`;
+        const kg = Number(value || 0);
+        if (kg > 0 && kg < 1) return `${Math.round(kg * 1000)}g`;
+        return `${kg.toFixed(2)} kg`;
       }
       function productDisplayImage(product) {
         return product?.ecommerceImageUrl || product?.productImageUrl || product?.imageUrl || product?.image || '';

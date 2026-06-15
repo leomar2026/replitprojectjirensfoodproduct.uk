@@ -59,7 +59,7 @@ router.get('/products', requireRole('manager', 'admin'), async (req, res) => {
 // POST /api/admin/products — create product
 router.post('/products', requireRole('admin'), async (req, res) => {
     const { name, sku, category, pack_display, uom, price, promo_price, cost_price,
-            description, image_filename, weight_kg, stock_quantity, reorder_level,
+            description, image_filename, weight_kg, display_weight, stock_quantity, reorder_level,
             ecommerce_visible } = req.body;
 
     if (!name || !sku || price == null) {
@@ -69,16 +69,16 @@ router.post('/products', requireRole('admin'), async (req, res) => {
     try {
         const result = await pool.query(`
             INSERT INTO products (name, sku, category, pack_display, uom, price, promo_price,
-                cost_price, description, image_filename, weight_kg, stock_quantity,
+                cost_price, description, image_filename, weight_kg, display_weight, stock_quantity,
                 reorder_level, ecommerce_visible)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
             RETURNING *
         `, [
             name, sku, category || 'Frozen Products', pack_display || '500g pack',
             uom || 'pack', Number(price), promo_price ? Number(promo_price) : null,
             Number(cost_price || 0), description || '', image_filename || '',
-            Number(weight_kg || 0), Number(stock_quantity || 0),
-            Number(reorder_level || 0), ecommerce_visible !== false
+            Number(weight_kg || 0), display_weight || '',
+            Number(stock_quantity || 0), Number(reorder_level || 0), ecommerce_visible !== false
         ]);
         res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -92,7 +92,7 @@ router.post('/products', requireRole('admin'), async (req, res) => {
 router.put('/products/:id', requireRole('manager', 'admin'), async (req, res) => {
     const { id } = req.params;
     const { name, sku, category, pack_display, uom, price, promo_price, cost_price,
-            description, image_filename, weight_kg, stock_quantity, reorder_level,
+            description, image_filename, weight_kg, display_weight, stock_quantity, reorder_level,
             is_active, ecommerce_visible, stock_display_status, delivery_unit } = req.body;
 
     try {
@@ -114,7 +114,8 @@ router.put('/products/:id', requireRole('manager', 'admin'), async (req, res) =>
                 is_active = COALESCE($14, is_active),
                 ecommerce_visible = COALESCE($15, ecommerce_visible),
                 stock_display_status = $16,
-                delivery_unit = COALESCE($18, delivery_unit)
+                delivery_unit = COALESCE($18, delivery_unit),
+                display_weight = $19
             WHERE id = $17
             RETURNING *
         `, [
@@ -131,7 +132,8 @@ router.put('/products/:id', requireRole('manager', 'admin'), async (req, res) =>
             ecommerce_visible != null ? Boolean(ecommerce_visible) : null,
             stock_display_status || null,
             id,
-            delivery_unit || null
+            delivery_unit || null,
+            display_weight !== undefined ? (display_weight || '') : null
         ]);
         if (!result.rows.length) return res.status(404).json({ error: 'Product not found.' });
         res.json(result.rows[0]);

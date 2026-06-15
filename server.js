@@ -255,6 +255,7 @@ app.listen(PORT, HOST, async () => {
     if (dbOk) {
         pool.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_date DATE').catch(() => {});
         pool.query('ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_email VARCHAR(255)').catch(() => {});
+        pool.query('ALTER TABLE products ADD COLUMN IF NOT EXISTS display_weight VARCHAR(50)').catch(() => {});
         pool.query("INSERT INTO app_settings (key, value) VALUES ('large_order_max_packs','11') ON CONFLICT (key) DO NOTHING").catch(() => {});
     }
 });

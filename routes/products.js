@@ -8,7 +8,7 @@ router.get('/', async (req, res) => {
     try {
         const result = await pool.query(`
             SELECT id, name, sku, category, pack_display, uom, price, promo_price,
-                   description, image_filename, weight_kg, stock_quantity,
+                   description, image_filename, weight_kg, display_weight, stock_quantity,
                    reorder_level, is_active, ecommerce_visible, stock_display_status
             FROM products
             WHERE is_active = true AND ecommerce_visible = true

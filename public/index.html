@@ -1758,7 +1758,8 @@
                 <input id="new-product-price" placeholder="Price" type="number" min="0" step="0.01" />
                 <input id="new-product-cost" placeholder="Cost price" type="number" min="0" step="0.01" />
                 <select id="new-product-uom"></select>
-                <input id="new-product-weight" placeholder="Weight kg" type="number" min="0" step="0.01" />
+                <input id="new-product-weight" placeholder="Weight (kg) — for delivery calculation" type="number" min="0" step="0.01" />
+                <input id="new-product-display-weight" placeholder="Display weight label (e.g. 420g pack)" />
                 <select id="new-product-delivery-unit" title="Delivery unit — how this product is counted for delivery fees">
                   <option value="KG">KG (by weight)</option>
                   <option value="PACK">PACK (per pack)</option>
@@ -2172,10 +2173,10 @@
                   <select id="fee-type" style="font-size:.95rem" onchange="updateFeeTypeFormFields(this.value)"><option value="KG">KG (by weight)</option><option value="PACK">PACK (by count)</option></select>
                 </label>
                 <label id="fee-min-label" style="display:flex;flex-direction:column;gap:4px;font-size:.8rem;font-weight:600;color:var(--muted)">Min (kg / packs)
-                  <input id="fee-min-weight" type="number" min="0" step="1" placeholder="e.g. 1" />
+                  <input id="fee-min-weight" type="number" min="0" step="0.001" placeholder="e.g. 1" />
                 </label>
                 <label id="fee-max-label" style="display:flex;flex-direction:column;gap:4px;font-size:.8rem;font-weight:600;color:var(--muted)">Max (kg / packs)
-                  <input id="fee-max-weight" type="number" min="0" step="1" placeholder="e.g. 10" />
+                  <input id="fee-max-weight" type="number" min="0" step="0.001" placeholder="e.g. 10" />
                 </label>
                 <label id="fee-amount-label-wrap" style="display:flex;flex-direction:column;gap:4px;font-size:.8rem;font-weight:600;color:var(--muted)"><span id="fee-amount-label">Delivery Fee</span>
                   <input id="fee-amount" type="number" min="0" step="0.01" placeholder="e.g. 5.00" />
@@ -3200,7 +3201,8 @@
           <input id="pem-description" placeholder="Description" />
           <input id="pem-price" type="number" min="0" step="0.01" placeholder="Price" required />
           <input id="pem-cost" type="number" min="0" step="0.01" placeholder="Cost price" />
-          <input id="pem-weight" type="number" min="0" step="0.01" placeholder="Weight (kg)" />
+          <input id="pem-weight" type="number" min="0" step="0.01" placeholder="Weight (kg) — used for delivery fee calculation" />
+          <input id="pem-display-weight" placeholder="Display weight label (e.g. 420g pack) — shown on website" />
           <select id="pem-delivery-unit">
             <option value="KG">KG (by weight)</option>
             <option value="PACK">PACK (per pack)</option>
@@ -3355,6 +3357,7 @@
           productImageUrl,
           ecommerceImageUrl: product.ecommerceImageUrl || productImageUrl,
           weightKg: Number(product.weightKg ?? product.weight ?? seed[7] ?? 0),
+          displayWeight: product.displayWeight || product.display_weight || '',
           costPrice: Number(product.costPrice ?? product.cost ?? seed[8] ?? 0),
           promoPrice: product.promoPrice === '' || product.promoPrice == null ? '' : Number(product.promoPrice),
           ecommerceVisible: product.ecommerceVisible !== false,
@@ -3445,6 +3448,7 @@
           productImageUrl: p.image_filename || '',
           ecommerceImageUrl: p.image_filename || '',
           weightKg: Number(p.weight_kg || 0),
+          displayWeight: p.display_weight || '',
           costPrice: Number(p.cost_price || 0),
           uom: p.uom || 'pack',
           stockQuantity: Number(p.stock_quantity || 0),
@@ -3856,7 +3860,7 @@
             <div class="sku">${p.sku}</div>
             <h3 class="product-click" onclick="${productDisplayImage(p) ? `openPreview('${productDisplayImage(p)}','${p.name}')` : ''}">${p.name}</h3>
             <p class="desc">${p.description}</p>
-            <div class="buy"><div><small>${p.pack} · ${formatWeight(p.weightKg)}</small><div class="price">${money(p.price)}</div></div><button class="primary" onclick="addToCart(${p.id})">Add</button></div>
+            <div class="buy"><div><small>${p.pack}${(p.displayWeight || p.weightKg) ? ' · ' + (p.displayWeight || formatWeight(p.weightKg)) : ''}</small><div class="price">${money(p.price)}</div></div><button class="primary" onclick="addToCart(${p.id})">Add</button></div>
           </div>
         </article>
       `).join('') : '<div class="panel" style="grid-column:1/-1"><h2>No active products</h2><p class="desc">Products are hidden because they are disabled in the backend.</p><button class="primary" onclick="restoreProductDisplay()">Show products again</button></div>';
@@ -5589,7 +5593,7 @@
                   : `<div class="product-thumb" style="display:flex;align-items:center;justify-content:center;font-size:18px;color:#9ca3af">📦</div>`}
                 <div>
                   <strong>${p.name}</strong>
-                  <div class="order-row-meta">${p.sku}${p.uom ? ' · ' + p.uom : ''}</div>
+                  <div class="order-row-meta">${p.sku}${p.uom ? ' · ' + p.uom : ''}${p.displayWeight ? ' · ' + p.displayWeight : ''}</div>
                 </div>
               </div>
             </td>
@@ -8960,7 +8964,7 @@
       const _PRODUCT_DB_FIELDS = {
         name: 'name', sku: 'sku', category: 'category', description: 'description',
         price: 'price', costPrice: 'cost_price', uom: 'uom',
-        weightKg: 'weight_kg', stockQuantity: 'stock_quantity', reorderLevel: 'reorder_level',
+        weightKg: 'weight_kg', displayWeight: 'display_weight', stockQuantity: 'stock_quantity', reorderLevel: 'reorder_level',
         deliveryUnit: 'delivery_unit',
         imageUrl: 'image_filename', productImageUrl: 'image_filename', ecommerceImageUrl: 'image_filename',
         active: 'is_active', ecommerceVisible: 'ecommerce_visible', stockDisplayStatus: 'stock_display_status'
@@ -9139,6 +9143,7 @@
         document.getElementById('pem-price').value = Number(p.price || 0).toFixed(2);
         document.getElementById('pem-cost').value = Number(p.costPrice || 0).toFixed(2);
         document.getElementById('pem-weight').value = Number(p.weightKg || 0).toFixed(2);
+        document.getElementById('pem-display-weight').value = p.displayWeight || '';
         document.getElementById('pem-delivery-unit').value = (p.deliveryUnit || 'KG').toUpperCase();
         document.getElementById('pem-stock').value = Number(p.stockQuantity || 0);
         document.getElementById('pem-reorder').value = Number(p.reorderLevel || 0);
@@ -9258,16 +9263,17 @@
         const price = Number(document.getElementById('pem-price').value);
         const costPrice = Number(document.getElementById('pem-cost').value || 0);
         const weightKg = Number(document.getElementById('pem-weight').value || 0);
+        const displayWeight = document.getElementById('pem-display-weight').value.trim();
         const deliveryUnit = document.getElementById('pem-delivery-unit').value;
         const stockQuantity = Number(document.getElementById('pem-stock').value || 0);
         const reorderLevel = Number(document.getElementById('pem-reorder').value || 0);
         const imageUrl = document.getElementById('pem-image-url').value.trim();
         if (!name || Number.isNaN(price) || price < 0) { alert('Please enter a product name and valid price.'); return; }
         p.name = name; p.sku = sku; p.description = description; p.price = price;
-        p.costPrice = costPrice; p.weightKg = weightKg; p.deliveryUnit = deliveryUnit;
+        p.costPrice = costPrice; p.weightKg = weightKg; p.displayWeight = displayWeight; p.deliveryUnit = deliveryUnit;
         p.stockQuantity = stockQuantity; p.reorderLevel = reorderLevel;
         if (imageUrl) setProductImageFields(p, imageUrl, 'both');
-        const fields = { name, sku, description, price, costPrice, weightKg, deliveryUnit, stockQuantity, reorderLevel };
+        const fields = { name, sku, description, price, costPrice, weightKg, displayWeight, deliveryUnit, stockQuantity, reorderLevel };
         for (const [field, value] of Object.entries(fields)) persistProductField(_editingProductId, field, value);
         if (imageUrl) persistProductField(_editingProductId, 'imageUrl', imageUrl);
         document.getElementById('product-edit-modal').classList.remove('open');
@@ -9299,6 +9305,7 @@
         const costPrice = Number(document.getElementById('new-product-cost').value || 0);
         const uom = document.getElementById('new-product-uom').value.trim() || 'pack';
         const weightKg = Number(document.getElementById('new-product-weight').value || 0);
+        const displayWeight = (document.getElementById('new-product-display-weight')?.value || '').trim();
         const deliveryUnit = (document.getElementById('new-product-delivery-unit')?.value || 'KG').toUpperCase();
         const stockQuantity = Number(document.getElementById('new-product-stock').value || 0);
         const reorderLevel = Number(document.getElementById('new-product-reorder').value || 0);
@@ -9327,6 +9334,7 @@
               price,
               cost_price: costPrice,
               weight_kg: weightKg,
+              display_weight: displayWeight,
               stock_quantity: stockQuantity,
               reorder_level: reorderLevel,
               description: description || '',

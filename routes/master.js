@@ -454,6 +454,30 @@ router.post('/settings/delivery-fee', requireRole('manager', 'admin'), async (re
     }
 });
 
+// POST /api/admin/master/settings/delivery-fee/:id/update  (update existing rule — PUT blocked by proxy)
+router.post('/settings/delivery-fee/:id/update', requireRole('manager', 'admin'), async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const { min_weight = 0, max_weight = 0, fee = 0, currency = 'GBP', active = true, fee_type = 'KG', contact_required = false } = req.body;
+        const validFeeType = ['KG', 'PACK'].includes(String(fee_type).toUpperCase()) ? String(fee_type).toUpperCase() : 'KG';
+        const result = await client.query(
+            'UPDATE delivery_fee_rules SET min_weight=$1, max_weight=$2, fee=$3, currency=$4, active=$5, fee_type=$6, contact_required=$7, updated_at=NOW() WHERE id=$8 RETURNING *',
+            [Number(min_weight), Number(max_weight), Number(fee) || 0, currency, active, validFeeType, !!contact_required, req.params.id]
+        );
+        if (!result.rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Rule not found.' }); }
+        await addAuditLog(client, 'delivery_fee_updated', 'delivery_fee_rule', req.params.id,
+            req.session.fullName || req.session.username, { min_weight, max_weight, fee, fee_type: validFeeType });
+        await client.query('COMMIT');
+        res.json({ message: 'Delivery fee rule updated.', rule: result.rows[0] });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: 'Failed to update delivery fee rule.' });
+    } finally {
+        client.release();
+    }
+});
+
 // PUT /api/admin/master/settings/delivery-fee/:id  (update existing rule by id)
 router.put('/settings/delivery-fee/:id', requireRole('manager', 'admin'), async (req, res) => {
     const client = await pool.connect();

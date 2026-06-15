@@ -4104,9 +4104,7 @@
         return lines.reduce((sum, item) => sum + Number(item.weightKg || 0) * Number(item.quantity || 0), 0);
       }
       function calculatePackQuantity(lines = cart) {
-        return lines
-          .filter((item) => { const u = ((productById(item.id)?.deliveryUnit) || 'KG').toUpperCase(); return u === 'PACK'; })
-          .reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+        return lines.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
       }
       function calculateDeliveryFeeByPack(qty) {
         const amount = Number(qty || 0);
@@ -4128,7 +4126,7 @@
         const weight = Number(totalWeight || 0);
         if (weight <= 0) return { fee: 0, currency: appCurrency, rule: null };
         const activeRules = deliveryFeeRules
-          .filter((rule) => rule.active)
+          .filter((rule) => rule.active && (rule.feeType || 'KG') === 'KG')
           .sort((a, b) => Number(a.maxWeight) - Number(b.maxWeight));
         const rule = activeRules.find((item) => weight >= Number(item.minWeight || 0) && weight <= Number(item.maxWeight || 0))
           || activeRules.find((item) => weight <= Number(item.maxWeight || 0))
@@ -4309,10 +4307,15 @@
         const rows = document.getElementById('checkout-postage-rows');
         if (!rows) return;
         const kgRules = deliveryFeeRules.filter(r => r.active && (!r.feeType || r.feeType === 'KG'));
-        if (!kgRules.length) { rows.innerHTML = '<span style="color:var(--muted)">Delivery fees will be calculated at checkout.</span>'; return; }
-        rows.innerHTML = kgRules.map(r => {
-          const label = r.maxWeight >= 9999 ? `Over ${r.minWeight}kg` : r.minWeight <= 0 ? `Up to ${r.maxWeight}kg` : `${r.minWeight}–${r.maxWeight}kg`;
-          return `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #e0f2fe"><span>${label}</span><strong>£${Number(r.fee).toFixed(2)}</strong></div>`;
+        const packRules = deliveryFeeRules.filter(r => r.active && r.feeType === 'PACK' && !r.contactRequired);
+        if (!kgRules.length && !packRules.length) { rows.innerHTML = '<span style="color:var(--muted)">Delivery fees will be calculated at checkout.</span>'; return; }
+        const displayRules = kgRules.length ? kgRules : packRules;
+        const isPack = kgRules.length === 0;
+        rows.innerHTML = displayRules.map(r => {
+          const label = isPack
+            ? (r.maxWeight <= 0 ? `${Number(r.minWeight)}+ packs` : `${Number(r.minWeight)}–${Number(r.maxWeight)} packs`)
+            : (r.maxWeight >= 9999 ? `Over ${r.minWeight}kg` : r.minWeight <= 0 ? `Up to ${r.maxWeight}kg` : `${r.minWeight}–${r.maxWeight}kg`);
+          return `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #e0f2fe"><span>${label}</span><strong>${r.currency || appCurrency} ${Number(r.fee).toFixed(2)}</strong></div>`;
         }).join('');
       }
       function applyDeliveryScheduleToAdminUI() {
@@ -9516,9 +9519,9 @@
         try {
           const isEditing = editingRuleId !== null;
           const url = isEditing
-            ? `/api/admin/master/settings/delivery-fee/${editingRuleId}`
+            ? `/api/admin/master/settings/delivery-fee/${editingRuleId}/update`
             : '/api/admin/master/settings/delivery-fee';
-          const method = isEditing ? 'PUT' : 'POST';
+          const method = 'POST';
           const res = await fetch(url, {
             method, credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },

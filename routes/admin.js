@@ -88,8 +88,17 @@ router.post('/products', requireRole('admin'), async (req, res) => {
     }
 });
 
+// POST /api/admin/products/:id/update — update product (PUT blocked by proxy)
+router.post('/products/:id/update', requireRole('manager', 'admin'), async (req, res) => {
+    return updateProduct(req, res);
+});
+
 // PUT /api/admin/products/:id — update product
 router.put('/products/:id', requireRole('manager', 'admin'), async (req, res) => {
+    return updateProduct(req, res);
+});
+
+async function updateProduct(req, res) {
     const { id } = req.params;
     const { name, sku, category, pack_display, uom, price, promo_price, cost_price,
             description, image_filename, weight_kg, display_weight, stock_quantity, reorder_level,
@@ -138,10 +147,10 @@ router.put('/products/:id', requireRole('manager', 'admin'), async (req, res) =>
         if (!result.rows.length) return res.status(404).json({ error: 'Product not found.' });
         res.json(result.rows[0]);
     } catch (err) {
-        console.error('PUT /api/admin/products/:id error:', err);
+        console.error('products update error:', err);
         res.status(500).json({ error: 'Failed to update product.' });
     }
-});
+}
 
 // GET /api/admin/products/images — list all images in the product image library
 router.get('/products/images', requireRole('manager', 'admin'), (req, res) => {

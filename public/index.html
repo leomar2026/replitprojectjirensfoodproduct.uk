@@ -8978,8 +8978,8 @@
         const timerKey = `${id}-${field}`;
         clearTimeout(_productSaveTimers[timerKey]);
         _productSaveTimers[timerKey] = setTimeout(() => {
-          fetch(`/api/admin/products/${id}`, {
-            method: 'PUT', credentials: 'same-origin',
+          fetch(`/api/admin/products/${id}/update`, {
+            method: 'POST', credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ [col]: dbValue })
           }).catch((e) => console.warn('Could not persist product field to DB:', e));

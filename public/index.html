@@ -295,6 +295,9 @@
       .product-click { cursor: zoom-in; }
       .thumb { height: 165px; position: relative; background-size: cover; background-position: center; }
       .pill { position: absolute; left: 12px; top: 12px; border-radius: 999px; background: white; color: var(--ember); padding: 7px 10px; font-size: 12px; font-weight: 900; }
+      .oos-pill { left: auto; right: 12px; background: #991b1b; color: #fff; }
+      .oos-card { opacity: 0.72; }
+      .oos-card .photo { filter: grayscale(40%); }
       .card-body { padding: 16px; }
       .sku { color: var(--gold); font-size: 12px; font-weight: 900; }
       .desc { color: rgba(32,32,32,.65); min-height: 44px; line-height: 1.45; }
@@ -3453,6 +3456,7 @@
           uom: p.uom || 'pack',
           stockQuantity: Number(p.stock_quantity || 0),
           reorderLevel: Number(p.reorder_level || 0),
+          stockDisplayStatus: p.stock_display_status || '',
           active: p.is_active,
           ecommerceVisible: p.ecommerce_visible,
           deliveryUnit: p.delivery_unit || 'KG'
@@ -3854,13 +3858,13 @@
         adminProducts = adminProducts.map(normalizeProduct);
         const activeProducts = adminProducts.filter((p) => p.active && p.ecommerceVisible !== false);
         document.getElementById('products').innerHTML = activeProducts.length ? activeProducts.map((p) => `
-        <article class="card">
-          <div class="photo thumb product-click" role="${productDisplayImage(p) ? 'img' : 'presentation'}" aria-label="${p.name} product image" onclick="${productDisplayImage(p) ? `openPreview('${productDisplayImage(p)}','${p.name}')` : ''}" style="${productDisplayImage(p) ? `background-image:url('${productDisplayImage(p)}')` : ''}"><span class="pill">${p.category}</span></div>
+        <article class="card${p.stockDisplayStatus === 'Out of Stock' ? ' oos-card' : ''}">
+          <div class="photo thumb product-click" role="${productDisplayImage(p) ? 'img' : 'presentation'}" aria-label="${p.name} product image" onclick="${productDisplayImage(p) ? `openPreview('${productDisplayImage(p)}','${p.name}')` : ''}" style="${productDisplayImage(p) ? `background-image:url('${productDisplayImage(p)}')` : ''}"><span class="pill">${p.category}</span>${p.stockDisplayStatus === 'Out of Stock' ? '<span class="pill oos-pill">Out of Stock</span>' : ''}</div>
           <div class="card-body">
             <div class="sku">${p.sku}</div>
             <h3 class="product-click" onclick="${productDisplayImage(p) ? `openPreview('${productDisplayImage(p)}','${p.name}')` : ''}">${p.name}</h3>
             <p class="desc">${p.description}</p>
-            <div class="buy"><div><small>${p.displayWeight || (p.weightKg ? formatWeight(p.weightKg) : p.pack)}</small><div class="price">${money(p.price)}</div></div><button class="primary" onclick="addToCart(${p.id})">Add</button></div>
+            <div class="buy"><div><small>${p.displayWeight || (p.weightKg ? formatWeight(p.weightKg) : p.pack)}</small><div class="price">${money(p.price)}</div></div>${p.stockDisplayStatus === 'Out of Stock' ? '<button class="secondary" disabled style="opacity:.5;cursor:not-allowed">Out of Stock</button>' : `<button class="primary" onclick="addToCart(${p.id})">Add</button>`}</div>
           </div>
         </article>
       `).join('') : '<div class="panel" style="grid-column:1/-1"><h2>No active products</h2><p class="desc">Products are hidden because they are disabled in the backend.</p><button class="primary" onclick="restoreProductDisplay()">Show products again</button></div>';
@@ -4891,6 +4895,7 @@
       function addToCart(id) {
         const product = adminProducts.find((p) => p.id === id);
         if (!product) return;
+        if (product.stockDisplayStatus === 'Out of Stock') return;
         const line = cart.find((item) => item.id === id);
         if (line) {
           line.quantity += 1;
@@ -5602,10 +5607,14 @@
             <td style="font-size:.88rem">${p.category}</td>
             <td><strong>${money(p.price)}</strong>${Number(p.costPrice) > 0 ? `<div class="order-row-meta">Cost: ${money(p.costPrice)}</div>` : ''}</td>
             <td style="font-weight:700;${lowStock ? 'color:#c62828' : ''}">${p.stockQuantity || 0}${lowStock ? ' ⚠' : ''}</td>
-            <td><span class="status-badge ${p.active ? 'status-active' : 'status-inactive'}">${p.active ? 'Active' : 'Inactive'}</span></td>
+            <td>
+              <span class="status-badge ${p.active ? 'status-active' : 'status-inactive'}">${p.active ? 'Active' : 'Inactive'}</span>
+              ${p.stockDisplayStatus === 'Out of Stock' ? '<span class="status-badge status-inactive" style="margin-top:4px;display:block">Out of Stock</span>' : ''}
+            </td>
             <td style="white-space:nowrap">
               <button class="secondary" style="font-size:.82rem;padding:0 10px;min-height:32px" onclick="openEditProductModal(${p.id})">Edit</button>
               <button class="${p.active ? 'secondary' : 'primary'}" style="font-size:.82rem;padding:0 10px;min-height:32px" onclick="toggleProduct(${p.id})">${p.active ? 'Disable' : 'Enable'}</button>
+              <button class="${p.stockDisplayStatus === 'Out of Stock' ? 'primary' : 'secondary'}" style="font-size:.82rem;padding:0 10px;min-height:32px" onclick="toggleStockStatus(${p.id})">${p.stockDisplayStatus === 'Out of Stock' ? 'Mark In Stock' : 'Mark OOS'}</button>
             </td>
           </tr>`;
         }).join('')
@@ -9291,6 +9300,17 @@
         if (!product) return;
         product.active = !product.active;
         persistProductField(id, 'active', product.active);
+        renderProducts();
+        renderAdminProducts();
+        renderManagerProducts();
+        renderManagerPricing();
+        saveTestRecords();
+      }
+      function toggleStockStatus(id) {
+        const product = adminProducts.find((p) => p.id === id);
+        if (!product) return;
+        product.stockDisplayStatus = product.stockDisplayStatus === 'Out of Stock' ? '' : 'Out of Stock';
+        persistProductField(id, 'stockDisplayStatus', product.stockDisplayStatus);
         renderProducts();
         renderAdminProducts();
         renderManagerProducts();

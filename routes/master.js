@@ -551,7 +551,7 @@ router.delete('/settings/delivery-fee/:id', requireRole('admin'), async (req, re
 router.get('/settings/bank', requireRole('cashier', 'manager', 'admin'), async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM bank_details WHERE id = 1');
-        res.json(result.rows[0] || { id: 1, bank_name: '', account_name: '', account_number: '', qr_code_image: '', active: true });
+        res.json(result.rows[0] || { id: 1, bank_name: '', account_name: '', account_number: '', sort_code: '', qr_code_image: '', active: true });
     } catch (err) {
         res.status(500).json({ error: 'Failed to load bank details.' });
     }
@@ -562,15 +562,15 @@ router.post('/settings/bank', requireRole('manager', 'admin'), async (req, res) 
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-        const { bank_name, account_name, account_number, qr_code_image, active = true } = req.body;
+        const { bank_name, account_name, account_number, sort_code, qr_code_image, active = true } = req.body;
         const result = await client.query(`
-            INSERT INTO bank_details (id, bank_name, account_name, account_number, qr_code_image, active, updated_by)
-            VALUES (1, $1, $2, $3, $4, $5, $6)
+            INSERT INTO bank_details (id, bank_name, account_name, account_number, sort_code, qr_code_image, active, updated_by)
+            VALUES (1, $1, $2, $3, $4, $5, $6, $7)
             ON CONFLICT (id) DO UPDATE SET
-                bank_name=$1, account_name=$2, account_number=$3, qr_code_image=$4,
-                active=$5, updated_by=$6, updated_at=NOW()
+                bank_name=$1, account_name=$2, account_number=$3, sort_code=$4,
+                qr_code_image=$5, active=$6, updated_by=$7, updated_at=NOW()
             RETURNING *
-        `, [bank_name || null, account_name || null, account_number || null,
+        `, [bank_name || null, account_name || null, account_number || null, sort_code || null,
             qr_code_image || null, active, req.session.fullName || req.session.username]);
         await addAuditLog(client, 'bank_details_updated', 'bank_details', '1',
             req.session.fullName || req.session.username, { bank_name, account_name });

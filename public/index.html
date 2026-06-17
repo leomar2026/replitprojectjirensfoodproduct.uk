@@ -1584,6 +1584,7 @@
                 <span>Bank: <span id="checkout-bank-name">Jiren's Food Product Bank</span></span>
                 <span>Account Name: <span id="checkout-account-name">Jiren's Food Product</span></span>
                 <span>Account Number: <span id="checkout-account-number">000123456789</span></span>
+                <span>Sort Code: <span id="checkout-sort-code"></span></span>
                 <span>Payment reference is optional. Upload a transfer screenshot or receipt so the team can verify the order.</span>
                 <img id="checkout-bank-qr" class="qr-preview" src="" alt="Bank transfer QR code" />
               </div>
@@ -2578,6 +2579,7 @@
                   <input id="bank-name-input" placeholder="Bank Name" />
                   <input id="account-name-input" placeholder="Account Name" />
                   <input id="account-number-input" placeholder="Account Number" />
+                  <input id="sort-code-input" placeholder="Sort Code (e.g. 12-34-56)" />
                   <button class="logo-picker" type="button" onclick="document.getElementById('bank-qr-input').click()">
                     <img id="bank-qr-picker-preview" src="" alt="QR code preview" />
                     <div><strong>QR Code Upload</strong><span>PNG, JPG, or JPEG</span></div>
@@ -2596,6 +2598,7 @@
                     <span>Bank: <span id="bank-preview-name"></span></span>
                     <span>Account Name: <span id="bank-preview-account-name"></span></span>
                     <span>Account Number: <span id="bank-preview-account-number"></span></span>
+                    <span>Sort Code: <span id="bank-preview-sort-code"></span></span>
                     <img id="bank-qr-preview" class="qr-preview" src="" alt="Uploaded bank QR code preview" />
                   </div>
                 </div>
@@ -3718,7 +3721,7 @@
           }
           if (bankRes.ok) {
             const d = await bankRes.json();
-            bankDetails = { bankName: d.bank_name || '', accountName: d.account_name || '', accountNumber: d.account_number || '', qrCodeImage: d.qr_code_image || '', active: d.active !== false };
+            bankDetails = { bankName: d.bank_name || '', accountName: d.account_name || '', accountNumber: d.account_number || '', sortCode: d.sort_code || '', qrCodeImage: d.qr_code_image || '', active: d.active !== false };
           }
           if (packagingRes.ok) {
             const d = await packagingRes.json();
@@ -3902,6 +3905,7 @@
         bankName: "Jiren's Food Product Bank",
         accountName: "Jiren's Food Product",
         accountNumber: '000123456789',
+        sortCode: '',
         qrCodeImage: '',
         active: true
       };
@@ -4661,6 +4665,7 @@
             bankName: saved.bankDetails.bankName || saved.bankDetails.bank_name || bankDetails.bankName,
             accountName: saved.bankDetails.accountName || saved.bankDetails.account_name || bankDetails.accountName,
             accountNumber: saved.bankDetails.accountNumber || saved.bankDetails.account_number || bankDetails.accountNumber,
+            sortCode: saved.bankDetails.sortCode || saved.bankDetails.sort_code || '',
             qrCodeImage: saved.bankDetails.qrCodeImage || saved.bankDetails.qr_code_image || '',
             active: saved.bankDetails.active !== false && saved.bankDetails.active_status !== false
           };
@@ -5037,23 +5042,30 @@
           bankName: bankDetails.bankName || '',
           accountName: bankDetails.accountName || '',
           accountNumber: bankDetails.accountNumber || '',
+          sortCode: bankDetails.sortCode || '',
           qrCodeImage: bankDetails.qrCodeImage || '',
           active: bankDetails.active !== false
         };
         const bankNameInput = document.getElementById('bank-name-input');
         const accountNameInput = document.getElementById('account-name-input');
         const accountNumberInput = document.getElementById('account-number-input');
+        const sortCodeInput = document.getElementById('sort-code-input');
         const activeInput = document.getElementById('bank-active-input');
         if (bankNameInput) bankNameInput.value = details.bankName;
         if (accountNameInput) accountNameInput.value = details.accountName;
         if (accountNumberInput) accountNumberInput.value = details.accountNumber;
+        if (sortCodeInput) sortCodeInput.value = details.sortCode;
         if (activeInput) activeInput.value = String(details.active);
         setText('bank-preview-name', details.bankName || 'Not set');
         setText('bank-preview-account-name', details.accountName || 'Not set');
         setText('bank-preview-account-number', details.accountNumber || 'Not set');
+        setText('bank-preview-sort-code', details.sortCode || 'Not set');
         setText('checkout-bank-name', details.bankName || 'Not set');
         setText('checkout-account-name', details.accountName || 'Not set');
         setText('checkout-account-number', details.accountNumber || 'Not set');
+        setText('checkout-sort-code', details.sortCode || '');
+        const sortCodeEl = document.getElementById('checkout-sort-code');
+        if (sortCodeEl) sortCodeEl.closest('span').style.display = details.sortCode ? '' : 'none';
         setImagePreview('bank-qr-picker-preview', details.qrCodeImage, details.active);
         setImagePreview('bank-qr-preview', details.qrCodeImage, details.active);
         setImagePreview('checkout-bank-qr', details.qrCodeImage, details.active);
@@ -5064,6 +5076,7 @@
           bank_name: document.getElementById('bank-name-input').value.trim(),
           account_name: document.getElementById('account-name-input').value.trim(),
           account_number: document.getElementById('account-number-input').value.trim(),
+          sort_code: document.getElementById('sort-code-input').value.trim(),
           qr_code_image: bankDetails.qrCodeImage || '',
           active: document.getElementById('bank-active-input').value === 'true'
         };

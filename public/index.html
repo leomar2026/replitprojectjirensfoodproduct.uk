@@ -296,6 +296,7 @@
       .thumb { height: 165px; position: relative; background-size: cover; background-position: center; }
       .pill { position: absolute; left: 12px; top: 12px; border-radius: 999px; background: white; color: var(--ember); padding: 7px 10px; font-size: 12px; font-weight: 900; }
       .oos-pill { left: auto; right: 12px; background: #991b1b; color: #fff; }
+      .low-stock-pill { left: auto; right: 12px; background: #b45309; color: #fff; }
       .oos-card { opacity: 0.72; }
       .oos-card .photo { filter: grayscale(40%); }
       .card-body { padding: 16px; }
@@ -3459,7 +3460,15 @@
           uom: p.uom || 'pack',
           stockQuantity: Number(p.stock_quantity || 0),
           reorderLevel: Number(p.reorder_level || 0),
-          stockDisplayStatus: p.stock_display_status || '',
+          stockDisplayStatus: (() => {
+            const qty = Number(p.stock_quantity || 0);
+            const reorder = Number(p.reorder_level || 0);
+            if (qty <= 0 || p.stock_display_status === 'Out of Stock') return 'Out of Stock';
+            if (p.effective_status === 'Out of Stock') return 'Out of Stock';
+            if (reorder > 0 && qty <= reorder) return 'Low Stock';
+            if (p.effective_status === 'Low Stock') return 'Low Stock';
+            return p.stock_display_status || 'Available';
+          })(),
           active: p.is_active,
           ecommerceVisible: p.ecommerce_visible,
           deliveryUnit: p.delivery_unit || 'KG'
@@ -3883,12 +3892,20 @@
         const activeProducts = adminProducts.filter((p) => p.active && p.ecommerceVisible !== false);
         document.getElementById('products').innerHTML = activeProducts.length ? activeProducts.map((p) => `
         <article class="card${p.stockDisplayStatus === 'Out of Stock' ? ' oos-card' : ''}">
-          <div class="photo thumb product-click" role="${productDisplayImage(p) ? 'img' : 'presentation'}" aria-label="${p.name} product image" onclick="${productDisplayImage(p) ? `openPreview('${productDisplayImage(p)}','${p.name}')` : ''}" style="${productDisplayImage(p) ? `background-image:url('${productDisplayImage(p)}')` : ''}"><span class="pill">${p.category}</span>${p.stockDisplayStatus === 'Out of Stock' ? '<span class="pill oos-pill">Out of Stock</span>' : ''}</div>
+          <div class="photo thumb product-click" role="${productDisplayImage(p) ? 'img' : 'presentation'}" aria-label="${p.name} product image" onclick="${productDisplayImage(p) ? `openPreview('${productDisplayImage(p)}','${p.name}')` : ''}" style="${productDisplayImage(p) ? `background-image:url('${productDisplayImage(p)}')` : ''}">
+            <span class="pill">${p.category}</span>
+            ${p.stockDisplayStatus === 'Out of Stock' ? '<span class="pill oos-pill">Out of Stock</span>' : p.stockDisplayStatus === 'Low Stock' ? '<span class="pill low-stock-pill">Low Stock</span>' : ''}
+          </div>
           <div class="card-body">
             <div class="sku">${p.sku}</div>
             <h3 class="product-click" onclick="${productDisplayImage(p) ? `openPreview('${productDisplayImage(p)}','${p.name}')` : ''}">${p.name}</h3>
             <p class="desc">${p.description}</p>
-            <div class="buy"><div><small>${p.displayWeight || (p.weightKg ? formatWeight(p.weightKg) : p.pack)}</small><div class="price">${money(p.price)}</div></div>${p.stockDisplayStatus === 'Out of Stock' ? '<button class="secondary" disabled style="opacity:.5;cursor:not-allowed">Out of Stock</button>' : `<button class="primary" onclick="addToCart(${p.id})">Add</button>`}</div>
+            <div class="buy">
+              <div><small>${p.displayWeight || (p.weightKg ? formatWeight(p.weightKg) : p.pack)}</small><div class="price">${money(p.price)}</div></div>
+              ${p.stockDisplayStatus === 'Out of Stock'
+                ? '<button class="secondary" disabled style="opacity:.5;cursor:not-allowed" aria-disabled="true">Out of Stock</button>'
+                : `<button class="primary" onclick="addToCart(${p.id})">Add</button>`}
+            </div>
           </div>
         </article>
       `).join('') : '<div class="panel" style="grid-column:1/-1"><h2>No active products</h2><p class="desc">Products are hidden because they are disabled in the backend.</p><button class="primary" onclick="restoreProductDisplay()">Show products again</button></div>';
@@ -4908,10 +4925,24 @@
           console.warn('Preview database could not be loaded.', error);
         }
       }
-      function addToCart(id) {
+      async function addToCart(id) {
         const product = adminProducts.find((p) => p.id === id);
         if (!product) return;
         if (product.stockDisplayStatus === 'Out of Stock') return;
+        try {
+          const res = await fetch(`/api/products/${id}/stock`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.stock_quantity <= 0) {
+              product.stockDisplayStatus = 'Out of Stock';
+              renderProducts();
+              alert('This item is currently out of stock.');
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn('Stock check failed, proceeding with cached status:', e);
+        }
         const line = cart.find((item) => item.id === id);
         if (line) {
           line.quantity += 1;
@@ -4920,6 +4951,21 @@
         } else cart.push({ ...product, imageUrl: productDisplayImage(product), quantity: 1 });
         renderCart();
         saveTestRecords();
+      }
+      async function validateCartStock() {
+        const results = await Promise.all(cart.map(async (item) => {
+          try {
+            const res = await fetch(`/api/products/${item.id}/stock`);
+            if (!res.ok) return null;
+            const data = await res.json();
+            if (data.stock_quantity <= 0) return `"${item.name}" is out of stock`;
+            if (data.stock_quantity < item.quantity) return `"${item.name}" only has ${data.stock_quantity} available (you need ${item.quantity})`;
+            return null;
+          } catch (e) {
+            return null;
+          }
+        }));
+        return results.filter(Boolean);
       }
       function changeCartQty(id, delta) {
         const line = cart.find((item) => item.id === id);
@@ -4939,11 +4985,16 @@
         if (!cart.length) {
           container.innerHTML = '<p class="cart-empty">No products added yet. Go to Product and tap Add.</p>';
         } else {
-          container.innerHTML = cart.map((item) => `
-            <div class="cart-line">
+          container.innerHTML = cart.map((item) => {
+            const live = adminProducts.find((p) => p.id === item.id);
+            const isOos = live ? live.stockDisplayStatus === 'Out of Stock' : false;
+            const isLowStock = live ? live.stockDisplayStatus === 'Low Stock' : false;
+            return `
+            <div class="cart-line${isOos ? '" style="opacity:.7;border-left:3px solid #991b1b' : ''}">
               <div class="cart-thumb" role="${productDisplayImage(item) ? 'img' : 'presentation'}" aria-label="${item.name} product image" style="${productDisplayImage(item) ? `background-image:url('${productDisplayImage(item)}')` : ''}"></div>
-              <div>
-                <strong>${item.name}</strong><br />
+              <div style="flex:1">
+                <strong>${item.name}</strong>${isOos ? ' <span style="background:#991b1b;color:#fff;font-size:11px;padding:2px 7px;border-radius:99px;font-weight:700">Out of Stock</span>' : isLowStock ? ' <span style="background:#b45309;color:#fff;font-size:11px;padding:2px 7px;border-radius:99px;font-weight:700">Low Stock</span>' : ''}
+                ${isOos ? '<div style="color:#991b1b;font-size:.83rem;margin-top:2px">This item is no longer available. Please remove it before checkout.</div>' : ''}
                 <span class="cart-meta">
                   <span>SKU: ${item.sku}</span>
                   <span>Category: ${item.category}</span>
@@ -4953,16 +5004,16 @@
               </div>
               <div class="cart-price">Unit price: <strong>${money(item.price)}</strong></div>
               <div class="qty-controls">
-                <button class="secondary" onclick="changeCartQty(${item.id}, -1)">-</button>
+                <button class="secondary" onclick="changeCartQty(${item.id}, -1)"${isOos ? ' disabled' : ''}>-</button>
                 <strong>${item.quantity}</strong>
-                <button class="secondary" onclick="changeCartQty(${item.id}, 1)">+</button>
+                <button class="secondary" onclick="changeCartQty(${item.id}, 1)"${isOos ? ' disabled' : ''}>+</button>
               </div>
               <div class="cart-total" style="text-align:right">
                 <strong>${money(item.price * item.quantity)}</strong><br />
                 <button class="secondary" style="margin-top:6px" onclick="removeCartItem(${item.id})">Remove</button>
               </div>
-            </div>
-          `).join('');
+            </div>`;
+          }).join('');
         }
         const { subtotal, vat, productWeight, totalWeight, deliveryFee, discountAmount, promotion, grandTotal, contactRequired, packQty, icePack, packaging, totalFrozenPacks } = orderTotals(cart, selectedCheckoutMethod());
         const isDelivery = selectedCheckoutMethod() === 'delivery';
@@ -5537,6 +5588,16 @@
         const cartItems = cart.map(item => ({ product_id: item.id, quantity: item.quantity }));
         if (!cartItems.length) { alert('Your cart is empty.'); return; }
 
+        const submitBtn = event.target.querySelector('[type="submit"]');
+        if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Checking stock…'; }
+        const stockErrors = await validateCartStock();
+        if (stockErrors.length) {
+          alert('Some items in your cart are no longer available:\n\n' + stockErrors.join('\n') + '\n\nPlease update your cart and try again.');
+          if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Place order'; }
+          await initProductsFromApi();
+          return;
+        }
+
         // Generate a unique key for this checkout attempt — stays the same if user
         // retries after a network error, so the server can return the existing order
         // instead of creating a duplicate.
@@ -5562,8 +5623,8 @@
         formData.append('idempotency_key', _checkoutIdempotencyKey);
         if (proofFile) formData.append('payment_proof', proofFile);
 
-        const submitBtn = event.target.querySelector('[type="submit"]');
-        if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Placing order…'; }
+        if (submitBtn) { submitBtn.textContent = 'Placing order…'; }
+
 
         try {
           const res = await fetch('/api/orders', {
@@ -5582,6 +5643,9 @@
               if (limitNotice) limitNotice.style.display = '';
               if (limitText) limitText.textContent = data.error;
               if (placeBtn) { placeBtn.disabled = true; placeBtn.style.opacity = '0.5'; }
+            } else if (data.error && (data.error.includes('Insufficient stock') || data.error.includes('out of stock'))) {
+              alert(data.error + '\n\nPlease remove this item from your cart and try again.');
+              await initProductsFromApi();
             } else {
               alert(data.error || 'Failed to place order. Please try again.');
             }
@@ -5606,7 +5670,7 @@
         } catch (e) {
           alert('Network error. Please check your connection and try again.');
         } finally {
-          if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit order'; }
+          if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Place order'; }
         }
       }
       function renderAdminProducts() {
@@ -5631,10 +5695,14 @@
             </td>
             <td style="font-size:.88rem">${p.category}</td>
             <td><strong>${money(p.price)}</strong>${Number(p.costPrice) > 0 ? `<div class="order-row-meta">Cost: ${money(p.costPrice)}</div>` : ''}</td>
-            <td style="font-weight:700;${lowStock ? 'color:#c62828' : ''}">${p.stockQuantity || 0}${lowStock ? ' ⚠' : ''}</td>
+            <td style="font-weight:700;${p.stockDisplayStatus === 'Out of Stock' ? 'color:#991b1b' : lowStock ? 'color:#b45309' : ''}">${p.stockQuantity || 0}${p.stockDisplayStatus === 'Out of Stock' ? '' : lowStock ? ' ⚠' : ''}</td>
             <td>
               <span class="status-badge ${p.active ? 'status-active' : 'status-inactive'}">${p.active ? 'Active' : 'Inactive'}</span>
-              ${p.stockDisplayStatus === 'Out of Stock' ? '<span class="status-badge status-inactive" style="margin-top:4px;display:block">Out of Stock</span>' : ''}
+              ${p.stockDisplayStatus === 'Out of Stock'
+                ? '<span class="status-badge status-inactive" style="margin-top:4px;display:block">Out of Stock</span>'
+                : p.stockDisplayStatus === 'Low Stock'
+                  ? '<span class="status-badge" style="margin-top:4px;display:block;background:#fef3c7;color:#92400e;border:1px solid #fcd34d">Low Stock</span>'
+                  : '<span class="status-badge status-active" style="margin-top:4px;display:block">Available</span>'}
             </td>
             <td style="white-space:nowrap">
               <button class="secondary" style="font-size:.82rem;padding:0 10px;min-height:32px" onclick="openEditProductModal(${p.id})">Edit</button>

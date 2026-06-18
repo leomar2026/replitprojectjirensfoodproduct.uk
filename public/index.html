@@ -5654,19 +5654,19 @@
           // Success — clear the key so next checkout gets a fresh one
           _checkoutIdempotencyKey = null;
           cart = [];
-          renderCart();
           saveTestRecords();
           event.target.reset();
-          togglePaymentInstructions();
+          // Sync the toggle buttons and delivery fields back to the reset state (pickup)
+          // Without this, buttons stay showing "Delivery active" but select value = "pickup"
+          setCheckoutMethod('pickup');
+          renderCart();
           document.getElementById('checkout-panel').classList.remove('open');
           const msg = data.duplicate
             ? `Your order was already placed.\nOrder number: ${data.orderNumber}`
             : `Thank you for your order!\nOrder number: ${data.orderNumber}`;
           alert(msg);
-          renderAdminOrders();
-          renderCashierOrders();
-          renderManagerOrders();
-          fetchTodayOrderCount();
+          // Reload the page so stock levels, product availability and form state are all fresh
+          window.location.reload();
         } catch (e) {
           alert('Network error. Please check your connection and try again.');
         } finally {

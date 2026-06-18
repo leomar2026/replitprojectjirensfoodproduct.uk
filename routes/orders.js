@@ -20,27 +20,53 @@ async function getVatSettings(client) {
     return { rate: 0, active: false };
 }
 
-// DB-driven delivery fee — falls back to hardcoded tiers if no active KG rules exist
-async function calcDeliveryFeeFromDb(totalWeightKg, fulfillmentMethod, client) {
+// DB-driven delivery fee — mirrors frontend logic: PACK rules take priority over KG rules
+async function calcDeliveryFeeFromDb(totalWeightKg, fulfillmentMethod, client, totalPacks = 0) {
     if (fulfillmentMethod === 'pickup') return 0;
     const weight = Number(totalWeightKg || 0);
-    if (weight <= 0) return 0;
+    const packs  = Number(totalPacks || 0);
     try {
         const result = await client.query(
-            `SELECT min_weight, max_weight, fee
+            `SELECT min_weight, max_weight, fee, fee_type, contact_required
              FROM delivery_fee_rules
-             WHERE active = true AND (fee_type = 'KG' OR fee_type IS NULL)
-             ORDER BY max_weight ASC`
+             WHERE active = true
+             ORDER BY fee_type, min_weight ASC`
         );
-        if (result.rows.length) {
+        const rows = result.rows;
+
+        // ── PACK rules: checked first (same priority as frontend) ────────────
+        if (packs > 0) {
+            const packRules = rows
+                .filter(r => r.fee_type === 'PACK')
+                .sort((a, b) => Number(a.min_weight) - Number(b.min_weight));
+            if (packRules.length) {
+                const rule =
+                    packRules.find(r => {
+                        const min = Number(r.min_weight || 0);
+                        const max = Number(r.max_weight || 0);
+                        if (r.contact_required) return packs >= min;
+                        return packs >= min && (max === 0 || packs <= max);
+                    }) || packRules[packRules.length - 1];
+                if (rule) {
+                    if (rule.contact_required) return 0;   // contact-required = no fee charged by system
+                    return Number(rule.fee || 0);
+                }
+            }
+        }
+
+        // ── KG rules: used when no PACK rules matched ─────────────────────────
+        const kgRules = rows
+            .filter(r => r.fee_type === 'KG' || r.fee_type == null)
+            .sort((a, b) => Number(a.max_weight) - Number(b.max_weight));
+        if (kgRules.length && weight > 0) {
             const rule =
-                result.rows.find(r => weight >= Number(r.min_weight) && weight <= Number(r.max_weight)) ||
-                result.rows.find(r => weight <= Number(r.max_weight)) ||
-                result.rows[result.rows.length - 1];
+                kgRules.find(r => weight >= Number(r.min_weight) && weight <= Number(r.max_weight)) ||
+                kgRules.find(r => weight <= Number(r.max_weight)) ||
+                kgRules[kgRules.length - 1];
             return Number(rule?.fee || 0);
         }
     } catch (_) {}
-    // Hardcoded fallback
+    // Hardcoded fallback — only reached if delivery_fee_rules table is empty/missing
     if (weight <= 2)  return 3.65;
     if (weight <= 20) return 5.55;
     return 11.95;
@@ -219,7 +245,7 @@ router.post('/', upload.single('payment_proof'), async (req, res) => {
         const totalDeliveryWeight = parseFloat((productWeight + packaging.weightKg).toFixed(3));
 
         // ── Delivery fee (DB-driven, uses total delivery weight) ─────────────
-        const deliveryFee = await calcDeliveryFeeFromDb(totalDeliveryWeight, fulfillment_method || 'pickup', client);
+        const deliveryFee = await calcDeliveryFeeFromDb(totalDeliveryWeight, fulfillment_method || 'pickup', client, totalFrozenPacks);
 
         const vatSettings = await getVatSettings(client);
         const vatAmount   = parseFloat((subtotal * vatSettings.rate / 100).toFixed(2));

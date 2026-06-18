@@ -3467,16 +3467,37 @@
       }
       async function initProductsFromApi() {
         try {
-          const res = await fetch('/api/products');
-          if (!res.ok) return;
-          const apiProducts = await res.json();
-          if (Array.isArray(apiProducts) && apiProducts.length) {
-            adminProducts = apiProducts.map(mapApiProduct);
-            renderProducts();
-            populatePosProducts();
+          const [productsRes, feesRes] = await Promise.all([
+            fetch('/api/products'),
+            fetch('/api/products/delivery-fees')
+          ]);
+          if (productsRes.ok) {
+            const apiProducts = await productsRes.json();
+            if (Array.isArray(apiProducts) && apiProducts.length) {
+              adminProducts = apiProducts.map(mapApiProduct);
+              renderProducts();
+              populatePosProducts();
+            }
+          }
+          if (feesRes.ok) {
+            const fees = await feesRes.json();
+            if (Array.isArray(fees)) {
+              deliveryFeeRules = fees.map((r) => ({
+                id: r.id,
+                minWeight: Number(r.min_weight),
+                maxWeight: Number(r.max_weight),
+                fee: Number(r.fee),
+                currency: r.currency,
+                active: r.active,
+                feeType: r.fee_type || 'KG',
+                contactRequired: !!r.contact_required
+              }));
+              renderCart();
+              renderDeliveryFeeRules();
+            }
           }
         } catch (e) {
-          console.warn('Could not load products from API:', e);
+          console.warn('Could not load products/delivery fees from API:', e);
         }
       }
       async function initAllProductsFromApi() {
@@ -4510,7 +4531,6 @@
           priceChangeAuditLog,
           managerPriceApprovalRequired,
           numberSeries,
-          deliveryFeeRules,
           categoryMaster,
           uomMaster,
           taxVatSetup,
@@ -4716,16 +4736,7 @@
           active: series.active !== false
         })).filter((series) => series.documentType);
         ensureDefaultNumberSeries();
-        if (Array.isArray(saved.deliveryFeeRules) && saved.deliveryFeeRules.length) deliveryFeeRules = saved.deliveryFeeRules.map((rule, index) => ({
-          id: rule.id || Date.now() + index,
-          minWeight: Number(rule.minWeight ?? rule.minimumWeight ?? 0),
-          maxWeight: Number(rule.maxWeight ?? rule.maximumWeight ?? 0),
-          fee: Number(rule.fee ?? rule.deliveryFee ?? 0),
-          currency: rule.currency || 'GBP',
-          active: rule.active !== false,
-          feeType: rule.feeType || rule.fee_type || 'KG',
-          contactRequired: !!rule.contactRequired
-        })).filter((rule) => rule.maxWeight > 0 || rule.contactRequired);
+        // deliveryFeeRules intentionally NOT restored from localStorage — always loaded from DB via API
         if (Array.isArray(saved.categoryMaster) && saved.categoryMaster.length) categoryMaster = saved.categoryMaster.map((category, index) => ({
           id: category.id || Date.now() + index,
           name: category.name || String(category),
